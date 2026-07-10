@@ -36,7 +36,7 @@ Backend deploy settings checked:
 - Runtime: Docker.
 - Dockerfile: `backend/Dockerfile`.
 - Docker Context: repository root `.`.
-- Start Command: Dockerfile `CMD ["bun", "run", "start"]`.
+- Start Command: Dockerfile `CMD ["bun", "run", "--cwd", "backend", "start"]`.
 - Health Check Path: `/health`.
 - Backend binds to `0.0.0.0` and reads provider `PORT`.
 

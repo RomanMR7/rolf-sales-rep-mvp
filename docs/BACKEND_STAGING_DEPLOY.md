@@ -24,12 +24,12 @@ Do not commit real env values or secrets.
 - Runtime: Docker
 - Dockerfile: `backend/Dockerfile`
 - Docker Context: repository root `.`
-- Start Command: Dockerfile `CMD ["bun", "run", "start"]`
+- Start Command: Dockerfile `CMD ["bun", "run", "--cwd", "backend", "start"]`
 - Health Check Path: `/health`
 - Public protocol: HTTPS
 - Port: provider `PORT` environment variable
 
-The Dockerfile installs the monorepo dependencies, copies `packages/contracts` and `backend`, generates Prisma Client, and starts the Hono/Bun API. The server binds to `0.0.0.0` and reads the port from `PORT`.
+The Dockerfile installs the monorepo dependencies, copies `packages/contracts` and `backend`, generates Prisma Client, returns to repo root `/app`, and starts the Hono/Bun API through `bun run --cwd backend start`. The server binds to `0.0.0.0` and reads the port from `PORT`.
 
 ## Render Deploy
 

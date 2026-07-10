@@ -463,3 +463,37 @@ Manual next steps:
 * Load demo seed with `bun run seed`.
 * In Vercel, set `VITE_API_URL=https://...onrender.com` and redeploy.
 * In BotFather, set Mini App URL to `https://rolf-sales-rep-mvp-webapp.vercel.app`.
+
+## Live Staging Check - 2026-07-10
+
+Known public URLs:
+
+* Vercel frontend: `https://rolf-sales-rep-mvp-webapp.vercel.app`
+* Render backend: `https://rolf-sales-rep-mvp-backend.onrender.com`
+
+Live checks:
+
+* Render backend `/` returned 200.
+* Render backend `/health` returned 200.
+* Render backend `/openapi.json` returned 200.
+* Vercel frontend returned 200.
+* Vercel frontend bundle does not contain `localhost:3000`.
+* Vercel frontend bundle does not yet contain `https://rolf-sales-rep-mvp-backend.onrender.com`, so Vercel env `VITE_API_URL` still needs to be set and frontend redeployed.
+* Backend demo login `POST /api/auth/login` for `rep1@rolf-demo.local` returned 500, likely because staging migrations/seed are not applied yet or Render DB env is not fully connected.
+
+Render/Vercel access:
+
+* Render CLI/API token is not available in this environment.
+* Vercel CLI/API token is not available in this environment.
+* Render/Vercel UI actions must be completed manually unless credentials/CLI access are provided.
+
+Additional Docker fix:
+
+* Updated Dockerfile to end at repo root `/app` and start backend with `bun run --cwd backend start`.
+* This makes Render Shell commands from docs work directly:
+  `bun run --cwd backend prisma:deploy` and `bun run seed`.
+* Docker build passed after the change.
+* Docker run passed after the change:
+  `/health` 200, `/` 200, working directory `/app`.
+* Docker exec check passed:
+  `bun run --cwd backend prisma:validate`.

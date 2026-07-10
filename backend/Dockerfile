@@ -17,6 +17,8 @@ WORKDIR /app/backend
 
 RUN DATABASE_URL="postgresql://superuser:superpassword@localhost:5432/rolf_sales_rep_mvp?schema=public" bun run prisma:generate
 
+WORKDIR /app
+
 ENV NODE_ENV=production
 
-CMD ["bun", "run", "start"]
+CMD ["bun", "run", "--cwd", "backend", "start"]

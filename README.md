@@ -71,7 +71,7 @@ Render backend settings:
 - Runtime: Docker
 - Dockerfile: `backend/Dockerfile`
 - Docker Context: repository root `.`
-- Start Command: Dockerfile `CMD ["bun", "run", "start"]`
+- Start Command: Dockerfile `CMD ["bun", "run", "--cwd", "backend", "start"]`
 - Health Check Path: `/health`
 - Port: provider `PORT` environment variable; the backend binds to `0.0.0.0`
 
