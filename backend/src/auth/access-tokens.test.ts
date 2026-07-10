@@ -5,12 +5,13 @@ import { signAccessToken, verifyAccessToken } from './access-tokens'
 
 const env: AppEnv = {
   PORT: 3000,
-  DATABASE_URL: 'postgresql://superuser:superpassword@localhost:54329/web_app_demo',
+  DATABASE_URL: 'postgresql://superuser:superpassword@localhost:54329/rolf_sales_rep_mvp',
   JWT_SECRET: '12345678901234567890123456789012',
   CORS_ORIGINS: ['http://localhost:5173'],
   ACCESS_TOKEN_TTL_SECONDS: 60,
   REFRESH_TOKEN_TTL_DAYS: 30,
   COOKIE_SECURE: false,
+  ALLOW_DEV_AUTH: false,
   SPACES_UPLOAD_MAX_BYTES: 10 * 1024 * 1024,
   SPACES_UPLOAD_URL_TTL_SECONDS: 900,
   SPACES_DOWNLOAD_URL_TTL_SECONDS: 300,

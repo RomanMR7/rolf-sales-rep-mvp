@@ -1,4 +1,183 @@
-# Vibe Coding Template
+# ROLF Sales Rep MVP
+
+Telegram Mini App and web admin MVP for a ROLF oils sales representative workflow in Dubai.
+
+The current active surfaces are backend/API, webapp, local PostgreSQL, Telegram Mini App-oriented UI, and web admin panel. The native Expo mobile app is deferred. The demo uses textual branding only: "ROLF Sales App" and "ROLF Oils Demo"; official ROLF logo assets should be added only after the client provides approved files.
+
+Dubai demo direction:
+
+- business-first English UI for UAE/Dubai field sales;
+- AED prices and order totals;
+- demo customers across Al Quoz, Deira, Jebel Ali, and Downtown-style routes;
+- restrained graphite, off-white, and warm gold visual tone;
+- demo catalog data only, to be replaced by the client's real price list.
+
+Quick local startup:
+
+```powershell
+bun --version
+bun install
+docker compose up -d postgres
+bun run --cwd backend prisma:migrate
+bun run seed
+bun run dev:backend
+```
+
+In a second terminal, start the frontend:
+
+```powershell
+bun run dev:webapp
+```
+
+Default local URLs:
+
+- Backend: `http://localhost:3000/`
+- Backend health: `http://localhost:3000/health`
+- OpenAPI JSON: `http://localhost:3000/openapi.json`
+- Webapp: `http://localhost:5173/`
+
+## Deploy Webapp To Vercel
+
+Use Vercel only for the static Vite frontend. The backend must be deployed separately to a public HTTPS host.
+
+Vercel project settings:
+
+- Root Directory: `webapp`
+- Framework Preset: `Vite`
+- Install Command: `bun install`
+- Build Command: `bun run build`
+- Output Directory: `dist`
+- Environment Variable: `VITE_API_URL=https://your-backend-url.example.com`
+
+The frontend API client reads the backend URL only from `VITE_API_URL`. Set this in Vercel before deploying. Do not rely on a localhost fallback in staging or production.
+
+## Backend HTTPS Hosting
+
+For a simple MVP staging setup:
+
+- Frontend: Vercel
+- Backend: Render, Railway, Fly.io, Yandex Cloud, or a VPS with HTTPS
+- Database: managed PostgreSQL
+
+Yandex Cloud option:
+
+- Frontend: Vercel
+- Backend: Yandex Cloud Serverless Containers or Compute VM
+- Database: Yandex Managed PostgreSQL
+
+Required backend staging env:
+
+```env
+DATABASE_URL=postgresql://...
+JWT_SECRET=<random-32-plus-character-secret>
+CORS_ORIGINS=https://rolf-sales-rep-mvp.vercel.app
+COOKIE_SECURE=true
+TELEGRAM_BOT_TOKEN=<bot-token-from-BotFather>
+TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp.vercel.app
+ALLOW_DEV_AUTH=false
+```
+
+Production safety:
+
+- `ALLOW_DEV_AUTH=false` for staging and production.
+- Dev login is available only in Vite dev UI and backend accepts dev auth only with `NODE_ENV=development` plus `ALLOW_DEV_AUTH=true`.
+- If `TELEGRAM_BOT_TOKEN` is missing, real Telegram auth returns a backend configuration error.
+- `COOKIE_SECURE=true` is required for HTTPS cookie auth.
+- `CORS_ORIGINS` must be exact HTTPS origins, never `*`, and must not include URL paths.
+- Never commit `.env` files or secrets.
+
+Demo users after `bun run seed`:
+
+- Admin: `admin@rolf-demo.local`
+- Manager: `manager@rolf-demo.local`
+- Sales rep: `rep1@rolf-demo.local`
+- Sales rep: `rep2@rolf-demo.local`
+- Sales rep: `rep3@rolf-demo.local`
+- Password for all demo users: `DemoPass123!`
+
+Demo-ready flow:
+
+1. Open `http://localhost:5173/`.
+2. Sign in as `rep1@rolf-demo.local` with `DemoPass123!`.
+3. Check dashboard, scoped clients, catalog, visits, and orders.
+4. Create a visit from a client, then start and complete it in the Visits tab.
+5. Create a draft order with products, quantity, item discount, and order discount.
+6. Submit the order.
+7. Logout, sign in as `manager@rolf-demo.local`, then approve or reject the submitted order.
+8. Sign in again as `rep1@rolf-demo.local` and verify the order status changed.
+9. Sign in as `admin@rolf-demo.local` to show full data visibility.
+
+Latest local demo smoke result:
+
+- `rep1` scoped clients: 7.
+- `admin` clients: 20.
+- Visit flow: `PLANNED -> IN_PROGRESS -> COMPLETED`.
+- Order flow: `DRAFT -> SUBMITTED -> APPROVED`.
+- Total calculation checked with products, quantity, item discount, and order discount: `AED 246 - AED 15 = AED 231`.
+- Frontend dev server checked at `http://127.0.0.1:5173/`.
+
+Business MVP endpoints:
+
+- `GET /api/dashboard`
+- `GET|POST /api/clients`
+- `GET|PATCH|DELETE /api/clients/:id`
+- `GET|POST /api/product-categories`
+- `PATCH /api/product-categories/:id`
+- `GET|POST /api/products`
+- `GET|PATCH|DELETE /api/products/:id`
+- `GET|POST /api/visits`
+- `GET /api/visits/today`
+- `POST /api/visits/:id/start`
+- `POST /api/visits/:id/complete`
+- `POST /api/visits/:id/skip`
+- `GET|POST /api/orders`
+- `POST /api/orders/:id/submit`
+- `POST /api/orders/:id/approve`
+- `POST /api/orders/:id/reject`
+- `POST /api/orders/:id/cancel`
+
+Demo catalog note: Демо-номенклатура, заменить на реальный прайс клиента.
+
+If local migrations have not been applied yet, run this after PostgreSQL is healthy:
+
+```powershell
+bun run --cwd backend prisma:migrate
+```
+
+Telegram Mini App auth endpoint:
+
+- `POST /api/auth/telegram`
+- Production accepts only valid Telegram WebApp `initData` signed by `TELEGRAM_BOT_TOKEN`.
+- Local dev fallback accepts `devUser` only when backend has both `NODE_ENV=development` and `ALLOW_DEV_AUTH=true`.
+
+Local dev auth setup in `backend/.env`:
+
+```powershell
+TELEGRAM_WEBAPP_URL="http://localhost:5173"
+ALLOW_DEV_AUTH="true"
+```
+
+Production must set a real `TELEGRAM_BOT_TOKEN` and must not enable dev auth:
+
+```powershell
+TELEGRAM_BOT_TOKEN="<bot-token-from-BotFather>"
+TELEGRAM_WEBAPP_URL="https://app.example.com"
+ALLOW_DEV_AUTH="false"
+```
+
+Local project memory lives in [`MEMORY.md`](MEMORY.md). Agents must read it before starting work, update it after important setup or product decisions, and use it as the fallback memory source when `memanto` or `memento` is unavailable.
+Project memory is stored in `MEMORY.md`. If `memanto/memento` CLI is unavailable, continue using `MEMORY.md` as fallback. Do not stop work because external memory CLI is missing.
+
+Project docs:
+
+- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [MVP scope](docs/MVP_SCOPE.md)
+- [Client demo script](docs/CLIENT_DEMO_SCRIPT.md)
+- [Telegram setup](docs/TELEGRAM_SETUP.md)
+- [Staging checklist](docs/STAGING_CHECKLIST.md)
+- [Yandex Cloud ROLF MVP deployment](docs/YANDEX_CLOUD_ROLF_MVP.md)
+
+## Template Baseline
 
 <p align="center">
   <img src="docs/assets/vibe_tmpl_schema.png" alt="Vibe Coding Template architecture schema" width="100%">
@@ -88,11 +267,23 @@ This template ships two browser surfaces. Putting a feature in the wrong one is 
 - Build it in **`website`** (Astro, static by default, SSR/hybrid only when needed) when pages must be **public and found by search engines or shared with rich link previews**: marketing/landing pages, content sites, blogs, docs, and the public storefront of a **marketplace**. For a marketplace, this usually means the landing page, category/search landing pages, public listing/product pages, SEO metadata, and rich previews.
 - Build it in **`webapp`** (React, client-side rendered) when screens live **behind sign-in and do not need SEO**: login-adjacent app flows after redirect, buyer account, seller/admin panels, checkout/account workflows, dashboards, settings, and authenticated tools. No crawler needs these, so CSR is the simpler, cheaper choice.
 
-Rule of thumb for the agent: *if a page must rank in search or preview nicely when shared, it belongs in `website`; if it is only reachable after login, it belongs in `webapp`.* Real marketplaces normally use **both**: the public catalog lives in `website`, the authenticated app lives in `webapp`, and both reuse the same `@web-app-demo/contracts` schemas. Do not rebuild SEO pages inside `webapp` to "keep everything in one app"; that loses the SEO the product needs. Do not move the full authenticated app into Astro just because the product has public SEO pages.
+Rule of thumb for the agent: *if a page must rank in search or preview nicely when shared, it belongs in `website`; if it is only reachable after login, it belongs in `webapp`.* Real marketplaces normally use **both**: the public catalog lives in `website`, the authenticated app lives in `webapp`, and both reuse the same `@rolf-sales-rep-mvp/contracts` schemas. Do not rebuild SEO pages inside `webapp` to "keep everything in one app"; that loses the SEO the product needs. Do not move the full authenticated app into Astro just because the product has public SEO pages.
 
 Astro stays the default website stack for this template because it is content-first, static-first, ships little JavaScript by default, and gives agents a clear SEO surface. Choose Next.js only when the project intentionally wants a Vercel-optimized ISR/cache platform as a core product requirement. Treat TanStack Start as an optional future React full-stack path for teams that want one React app with selective SSR; it is not the simple default for non-programmer vibe-coding projects.
 
-## Quick Start
+## Local Setup
+
+```bash
+bun --version
+bun install
+bun run test:contracts
+```
+
+Notes:
+
+* This project uses Bun.
+* `MEMORY.md` is used as the fallback memory file.
+* `memanto/memento` CLI is optional and currently unavailable.
 
 Install dependencies first:
 
@@ -160,7 +351,7 @@ Create `webapp/.env` when the browser client should use a non-default API URL:
 VITE_API_URL=http://localhost:3000
 ```
 
-Test runners use the separate Docker Compose `postgres_test` service and the `TEST_DATABASE_URL` shape from `.env.example`/`backend/.env.example`. Webapp Playwright E2E starts `postgres_test`, applies migrations to `web_app_demo_test`, runs the browser flow, and tears down its test database volume by default.
+Test runners use the separate Docker Compose `postgres_test` service and the `TEST_DATABASE_URL` shape from `.env.example`/`backend/.env.example`. Webapp Playwright E2E starts `postgres_test`, applies migrations to `rolf_sales_rep_mvp_test`, runs the browser flow, and tears down its test database volume by default.
 
 ## Workspace Commands
 

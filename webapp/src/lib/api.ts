@@ -1,32 +1,55 @@
 import {
   apiErrorSchema,
   authResponseSchema,
+  clientPointInputSchema,
+  clientResponseSchema,
+  dashboardResponseSchema,
+  listClientsResponseSchema,
+  listOrdersResponseSchema,
+  listProductCategoriesResponseSchema,
+  listProductsResponseSchema,
+  listVisitsResponseSchema,
   loginRequestSchema,
   logoutRequestSchema,
   meResponseSchema,
+  orderInputSchema,
+  orderPatchSchema,
+  orderResponseSchema,
+  productInputSchema,
+  productResponseSchema,
   refreshRequestSchema,
   refreshResponseSchema,
   registerRequestSchema,
+  telegramAuthRequestSchema,
+  visitInputSchema,
+  visitResponseSchema,
   type AuthResponse,
+  type ClientPointInput,
   type LoginRequest,
   type LogoutRequest,
   type MeResponse,
+  type OrderInput,
+  type OrderPatch,
+  type ProductInput,
   type RefreshRequest,
   type RefreshResponse,
   type RegisterRequest,
-} from '@web-app-demo/contracts'
+  type TelegramAuthRequest,
+  type VisitInput,
+} from '@rolf-sales-rep-mvp/contracts'
 import type { z } from 'zod'
 
-const apiBaseUrl = (import.meta.env?.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+const apiBaseUrl = import.meta.env?.VITE_API_URL?.replace(/\/$/, '')
 
 type ApiClientOptions = {
+  apiBaseUrl?: string
   getAccessToken: () => string | null
   setAccessToken: (accessToken: string | null) => void
   onAuthExpired?: () => void | Promise<void>
 }
 
 type RequestOptions = {
-  method?: 'GET' | 'POST'
+  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
   body?: unknown
   auth?: boolean
   retryOnUnauthorized?: boolean
@@ -70,6 +93,15 @@ export class ApiClient {
     })
   }
 
+  telegramAuth(input: TelegramAuthRequest): Promise<AuthResponse> {
+    const payload = telegramAuthRequestSchema.parse(input)
+    return this.request('/api/auth/telegram', authResponseSchema, {
+      method: 'POST',
+      body: payload,
+      auth: false,
+    })
+  }
+
   refresh(input: RefreshRequest = {}): Promise<RefreshResponse> {
     const payload = refreshRequestSchema.parse(input)
     return this.request('/api/auth/refresh', refreshResponseSchema, {
@@ -107,6 +139,91 @@ export class ApiClient {
     await this.options.onAuthExpired?.()
   }
 
+  dashboard() {
+    return this.request('/api/dashboard', dashboardResponseSchema, { auth: true })
+  }
+
+  clients(search?: string) {
+    const query = search ? `?search=${encodeURIComponent(search)}` : ''
+    return this.request(`/api/clients${query}`, listClientsResponseSchema, { auth: true })
+  }
+
+  createClient(input: ClientPointInput) {
+    return this.request('/api/clients', clientResponseSchema, {
+      method: 'POST',
+      body: clientPointInputSchema.parse(input),
+      auth: true,
+    })
+  }
+
+  productCategories() {
+    return this.request('/api/product-categories', listProductCategoriesResponseSchema, { auth: true })
+  }
+
+  products(search?: string, categoryId?: string) {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (categoryId) params.set('categoryId', categoryId)
+    const query = params.size > 0 ? `?${params.toString()}` : ''
+    return this.request(`/api/products${query}`, listProductsResponseSchema, { auth: true })
+  }
+
+  createProduct(input: ProductInput) {
+    return this.request('/api/products', productResponseSchema, {
+      method: 'POST',
+      body: productInputSchema.parse(input),
+      auth: true,
+    })
+  }
+
+  visits(today = false) {
+    return this.request(today ? '/api/visits/today' : '/api/visits', listVisitsResponseSchema, { auth: true })
+  }
+
+  createVisit(input: VisitInput) {
+    return this.request('/api/visits', visitResponseSchema, {
+      method: 'POST',
+      body: visitInputSchema.parse(input),
+      auth: true,
+    })
+  }
+
+  visitAction(id: string, action: 'start' | 'complete' | 'skip') {
+    return this.request(`/api/visits/${id}/${action}`, visitResponseSchema, {
+      method: 'POST',
+      body: {},
+      auth: true,
+    })
+  }
+
+  orders() {
+    return this.request('/api/orders', listOrdersResponseSchema, { auth: true })
+  }
+
+  createOrder(input: OrderInput) {
+    return this.request('/api/orders', orderResponseSchema, {
+      method: 'POST',
+      body: orderInputSchema.parse(input),
+      auth: true,
+    })
+  }
+
+  updateOrder(id: string, input: OrderPatch) {
+    return this.request(`/api/orders/${id}`, orderResponseSchema, {
+      method: 'PATCH',
+      body: orderPatchSchema.parse(input),
+      auth: true,
+    })
+  }
+
+  orderAction(id: string, action: 'submit' | 'approve' | 'reject' | 'cancel', body: { managerComment?: string } = {}) {
+    return this.request(`/api/orders/${id}/${action}`, orderResponseSchema, {
+      method: 'POST',
+      body,
+      auth: true,
+    })
+  }
+
   private async request<TSchema extends z.ZodType>(
     path: string,
     schema: TSchema,
@@ -118,7 +235,12 @@ export class ApiClient {
   }
 
   private async rawRequest(path: string, options: RequestOptions): Promise<Response> {
-    const response = await fetch(`${apiBaseUrl}${path}`, {
+    const baseUrl = this.options.apiBaseUrl?.replace(/\/$/, '') ?? apiBaseUrl
+    if (!baseUrl) {
+      throw new ApiRequestError(0, 'CONFIGURATION_ERROR', 'VITE_API_URL is not configured')
+    }
+
+    const response = await fetch(`${baseUrl}${path}`, {
       method: options.method ?? 'GET',
       credentials: 'include',
       headers: this.headers(options),

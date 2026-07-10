@@ -64,7 +64,7 @@ if (process.env.TEST_SKIP_DOCKER !== '1') {
     cwd: repositoryRoot,
     env,
   })
-  await waitForComposePostgres('postgres_test', 'web_app_demo_test', env)
+  await waitForComposePostgres('postgres_test', 'rolf_sales_rep_mvp_test', env)
 }
 
 run('bun', ['run', 'prisma:generate'], { env })

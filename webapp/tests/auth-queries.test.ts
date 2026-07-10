@@ -11,6 +11,11 @@ const user = {
   id: 'user_1',
   email: 'user@example.com',
   displayName: null,
+  role: 'SALES_REP',
+  telegramId: null,
+  telegramUsername: null,
+  telegramFirstName: null,
+  telegramLastName: null,
   createdAt: '2026-05-11T00:00:00.000Z',
 }
 

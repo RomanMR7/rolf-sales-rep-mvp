@@ -1,4 +1,4 @@
-import type { RefreshResponse } from '@web-app-demo/contracts'
+import type { RefreshResponse } from '@rolf-sales-rep-mvp/contracts'
 
 import type { ApiClient } from './api'
 

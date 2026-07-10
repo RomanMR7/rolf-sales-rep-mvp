@@ -19,6 +19,11 @@ export const userSchema = z.object({
   id: z.string(),
   email: emailSchema,
   displayName: z.string().nullable(),
+  role: z.enum(['ADMIN', 'MANAGER', 'SALES_REP']),
+  telegramId: z.string().nullable(),
+  telegramUsername: z.string().nullable(),
+  telegramFirstName: z.string().nullable(),
+  telegramLastName: z.string().nullable(),
   createdAt: z.string().datetime(),
 })
 
@@ -47,6 +52,22 @@ export const logoutRequestSchema = z
   .optional()
   .default({})
 
+export const telegramDevUserSchema = z.object({
+  telegramId: z.string().trim().min(1).max(64),
+  username: z.string().trim().min(1).max(64).optional(),
+  firstName: z.string().trim().min(1).max(80).optional(),
+  lastName: z.string().trim().min(1).max(80).optional(),
+})
+
+export const telegramAuthRequestSchema = z
+  .object({
+    initData: z.string().min(1).optional(),
+    devUser: telegramDevUserSchema.optional(),
+  })
+  .refine((value) => Boolean(value.initData) || Boolean(value.devUser), {
+    message: 'initData or devUser is required',
+  })
+
 export const authResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
@@ -68,6 +89,8 @@ export type RegisterPayload = z.output<typeof registerRequestSchema>
 export type LoginRequest = z.infer<typeof loginRequestSchema>
 export type RefreshRequest = z.infer<typeof refreshRequestSchema>
 export type LogoutRequest = z.infer<typeof logoutRequestSchema>
+export type TelegramDevUser = z.infer<typeof telegramDevUserSchema>
+export type TelegramAuthRequest = z.infer<typeof telegramAuthRequestSchema>
 export type AuthResponse = z.infer<typeof authResponseSchema>
 export type RefreshResponse = z.infer<typeof refreshResponseSchema>
 export type MeResponse = z.infer<typeof meResponseSchema>

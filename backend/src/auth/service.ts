@@ -2,17 +2,19 @@ import type {
   LoginRequest,
   RegisterPayload,
   UserDto,
-} from '@web-app-demo/contracts'
+} from '@rolf-sales-rep-mvp/contracts'
+import { randomBytes } from 'node:crypto'
 
 import type { DbClient } from '../db'
 import type { AppEnv } from '../env'
 import { AppError } from '../http/errors'
 import type { AuthenticatedUserContext } from '../http/context'
 import { userDtoFromAuthenticatedUser } from '../http/context'
-import { Prisma } from '../generated/prisma/client'
+import { Prisma, UserRole } from '../generated/prisma/client'
 import { signAccessToken, verifyAccessToken } from './access-tokens'
 import { hashPassword, verifyPassword } from './passwords'
 import { createRefreshToken, hashRefreshToken } from './refresh-tokens'
+import type { TelegramUserProfile } from './telegram'
 
 type SessionMetadata = {
   userAgent?: string
@@ -23,6 +25,11 @@ type UserRecord = {
   id: string
   email: string
   displayName: string | null
+  role: UserRole
+  telegramId: string | null
+  telegramUsername: string | null
+  telegramFirstName: string | null
+  telegramLastName: string | null
   createdAt: Date
 }
 
@@ -76,6 +83,49 @@ export class AuthService {
     if (!passwordMatches) {
       throw new AppError(401, 'UNAUTHORIZED', 'Invalid email or password')
     }
+
+    return this.issueSession(user, metadata)
+  }
+
+  async loginWithTelegram(profile: TelegramUserProfile, metadata: SessionMetadata) {
+    const displayName = displayNameFromTelegramProfile(profile)
+    const telegramData = {
+      telegramUsername: profile.username,
+      telegramFirstName: profile.firstName,
+      telegramLastName: profile.lastName,
+      ...(displayName ? { displayName } : {}),
+    }
+
+    const existingUser = await this.db.user.findUnique({
+      where: { telegramId: profile.telegramId },
+    })
+
+    if (existingUser) {
+      const user = await this.db.user.update({
+        where: { id: existingUser.id },
+        data: telegramData,
+      })
+      return this.issueSession(user, metadata)
+    }
+
+    const passwordHash = await hashPassword(randomBytes(32).toString('base64url'))
+    const user = await this.db.user
+      .create({
+        data: {
+          email: telegramEmail(profile.telegramId),
+          passwordHash,
+          displayName,
+          role: UserRole.SALES_REP,
+          telegramId: profile.telegramId,
+          telegramUsername: profile.username,
+          telegramFirstName: profile.firstName,
+          telegramLastName: profile.lastName,
+        },
+      })
+      .catch((error: unknown) => {
+        if (!isUniqueConstraintError(error)) throw error
+        throw new AppError(409, 'CONFLICT', 'Telegram user already exists')
+      })
 
     return this.issueSession(user, metadata)
   }
@@ -247,6 +297,19 @@ export function toUserDto(user: UserRecord): UserDto {
     id: user.id,
     email: user.email,
     displayName: user.displayName,
+    role: user.role,
+    telegramId: user.telegramId,
+    telegramUsername: user.telegramUsername,
+    telegramFirstName: user.telegramFirstName,
+    telegramLastName: user.telegramLastName,
     createdAt: user.createdAt.toISOString(),
   }
+}
+
+function displayNameFromTelegramProfile(profile: TelegramUserProfile) {
+  return [profile.firstName, profile.lastName].filter(Boolean).join(' ') || profile.username || null
+}
+
+function telegramEmail(telegramId: string) {
+  return `telegram-${telegramId}@telegram.rolf-sales-rep-mvp.local`
 }

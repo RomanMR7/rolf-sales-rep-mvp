@@ -1,5 +1,5 @@
 {
-  "name": "vibecoding-template",
+  "name": "rolf-sales-rep-mvp",
   "private": true,
   "version": "0.0.0",
   "license": "Apache-2.0",
@@ -31,6 +31,7 @@
     "test:backend:unit": "bun run --cwd backend test:unit",
     "test:backend:integration": "bun run --cwd backend test:integration",
     "test:webapp": "bun run --cwd webapp test",
+    "seed": "bun run --cwd backend seed",
     "smoke:backend:docker": "bun run --cwd backend smoke:docker",
     "e2e:webapp": "bun run --cwd webapp e2e"
   }

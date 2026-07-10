@@ -6,12 +6,13 @@ import type { AppEnv } from '../env'
 
 const env: AppEnv = {
   PORT: 3000,
-  DATABASE_URL: 'postgresql://superuser:superpassword@localhost:54329/web_app_demo',
+  DATABASE_URL: 'postgresql://superuser:superpassword@localhost:54329/rolf_sales_rep_mvp',
   JWT_SECRET: 'test-route-secret-at-least-thirty-two-chars-123',
   CORS_ORIGINS: ['https://web.example.com'],
   ACCESS_TOKEN_TTL_SECONDS: 60,
   REFRESH_TOKEN_TTL_DAYS: 30,
   COOKIE_SECURE: true,
+  ALLOW_DEV_AUTH: false,
   SPACES_UPLOAD_MAX_BYTES: 10 * 1024 * 1024,
   SPACES_UPLOAD_URL_TTL_SECONDS: 900,
   SPACES_DOWNLOAD_URL_TTL_SECONDS: 300,
@@ -21,7 +22,7 @@ const env: AppEnv = {
 describe('auth routes', () => {
   test('rejects secure cookie refresh and logout requests from untrusted origins before auth service work', async () => {
     const app = createApp({ env, prisma: {} as DbClient })
-    const refreshCookie = `web_app_demo_refresh=${'r'.repeat(32)}`
+    const refreshCookie = `rolf_sales_rep_mvp_refresh=${'r'.repeat(32)}`
 
     const noOriginRefresh = await app.request('/api/auth/refresh', {
       method: 'POST',

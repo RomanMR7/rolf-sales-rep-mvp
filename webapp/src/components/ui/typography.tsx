@@ -26,7 +26,7 @@ const typographyVariants = cva("min-w-0 tracking-normal", {
       input:
         "text-base leading-normal font-normal md:text-sm file:text-sm file:font-medium",
       caption: "text-xs leading-normal font-normal",
-      shortcut: "text-xs leading-normal tracking-widest font-normal",
+      shortcut: "text-xs leading-normal tracking-normal font-normal",
       code: "font-mono text-sm leading-normal font-medium",
       avatar: "text-sm leading-none font-normal group-data-[size=sm]/avatar:text-xs",
       avatarCount:

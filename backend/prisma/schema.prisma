@@ -8,13 +8,21 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  email        String        @unique
-  passwordHash String        @map("password_hash")
-  displayName  String?       @map("display_name")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-  sessions     AuthSession[]
+  id                String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  email             String        @unique
+  passwordHash      String        @map("password_hash")
+  displayName       String?       @map("display_name")
+  role              UserRole      @default(SALES_REP)
+  telegramId        String?       @unique @map("telegram_id")
+  telegramUsername  String?       @map("telegram_username")
+  telegramFirstName String?       @map("telegram_first_name")
+  telegramLastName  String?       @map("telegram_last_name")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  sessions          AuthSession[]
+  assignedClients   ClientPoint[] @relation("AssignedRepClients")
+  visits            Visit[]       @relation("SalesRepVisits")
+  orders            Order[]       @relation("SalesRepOrders")
 
   @@map("users")
 }
@@ -34,4 +42,177 @@ model AuthSession {
   @@index([userId], map: "auth_sessions_user_id_idx")
   @@index([expiresAt], map: "auth_sessions_expires_at_idx")
   @@map("auth_sessions")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  SALES_REP
+}
+
+model ClientPoint {
+  id              String            @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name            String
+  type            ClientPointType
+  contactPerson   String?           @map("contact_person")
+  phone           String?
+  city            String
+  address         String
+  latitude        Decimal?          @db.Decimal(9, 6)
+  longitude       Decimal?          @db.Decimal(9, 6)
+  assignedRepId   String            @db.Uuid @map("assigned_rep_id")
+  status          ClientPointStatus @default(ACTIVE)
+  comment         String?
+  lastVisitAt     DateTime?         @map("last_visit_at")
+  nextVisitAt     DateTime?         @map("next_visit_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  assignedRep     User              @relation("AssignedRepClients", fields: [assignedRepId], references: [id], map: "client_points_assigned_rep_id_fkey")
+  visits          Visit[]
+  orders          Order[]
+
+  @@index([assignedRepId], map: "client_points_assigned_rep_id_idx")
+  @@index([status], map: "client_points_status_idx")
+  @@map("client_points")
+}
+
+model ProductCategory {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name        String
+  slug        String    @unique
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  products    Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id          String          @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name        String
+  categoryId  String          @db.Uuid @map("category_id")
+  viscosity   String?
+  volume      String
+  sku         String          @unique
+  basePrice   Decimal         @map("base_price") @db.Decimal(12, 2)
+  currency    String          @default("AED")
+  description String?
+  isActive    Boolean         @default(true) @map("is_active")
+  stock       Int?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  category    ProductCategory @relation(fields: [categoryId], references: [id], map: "products_category_id_fkey")
+  orderItems  OrderItem[]
+
+  @@index([categoryId], map: "products_category_id_idx")
+  @@index([isActive], map: "products_is_active_idx")
+  @@map("products")
+}
+
+model Visit {
+  id            String       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  clientPointId String       @db.Uuid @map("client_point_id")
+  salesRepId    String       @db.Uuid @map("sales_rep_id")
+  plannedAt     DateTime     @map("planned_at")
+  startedAt     DateTime?    @map("started_at")
+  completedAt   DateTime?    @map("completed_at")
+  status        VisitStatus  @default(PLANNED)
+  result        VisitResult?
+  comment       String?
+  latitude      Decimal?     @db.Decimal(9, 6)
+  longitude     Decimal?     @db.Decimal(9, 6)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  clientPoint   ClientPoint  @relation(fields: [clientPointId], references: [id], map: "visits_client_point_id_fkey")
+  salesRep      User         @relation("SalesRepVisits", fields: [salesRepId], references: [id], map: "visits_sales_rep_id_fkey")
+  orders        Order[]
+
+  @@index([salesRepId], map: "visits_sales_rep_id_idx")
+  @@index([clientPointId], map: "visits_client_point_id_idx")
+  @@index([plannedAt], map: "visits_planned_at_idx")
+  @@map("visits")
+}
+
+model Order {
+  id            String      @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  orderNumber   String      @unique @map("order_number")
+  clientPointId String      @db.Uuid @map("client_point_id")
+  salesRepId    String      @db.Uuid @map("sales_rep_id")
+  visitId       String?     @db.Uuid @map("visit_id")
+  status        OrderStatus @default(DRAFT)
+  subtotal      Decimal     @default(0) @db.Decimal(12, 2)
+  discount      Decimal     @default(0) @db.Decimal(12, 2)
+  total         Decimal     @default(0) @db.Decimal(12, 2)
+  comment       String?
+  managerComment String?    @map("manager_comment")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  clientPoint   ClientPoint @relation(fields: [clientPointId], references: [id], map: "orders_client_point_id_fkey")
+  salesRep      User        @relation("SalesRepOrders", fields: [salesRepId], references: [id], map: "orders_sales_rep_id_fkey")
+  visit         Visit?      @relation(fields: [visitId], references: [id], map: "orders_visit_id_fkey")
+  items         OrderItem[]
+
+  @@index([salesRepId], map: "orders_sales_rep_id_idx")
+  @@index([clientPointId], map: "orders_client_point_id_idx")
+  @@index([status], map: "orders_status_idx")
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  orderId   String   @db.Uuid @map("order_id")
+  productId String   @db.Uuid @map("product_id")
+  quantity  Int
+  unitPrice Decimal  @map("unit_price") @db.Decimal(12, 2)
+  discount  Decimal  @default(0) @db.Decimal(12, 2)
+  lineTotal Decimal  @map("line_total") @db.Decimal(12, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, map: "order_items_order_id_fkey")
+  product   Product  @relation(fields: [productId], references: [id], map: "order_items_product_id_fkey")
+
+  @@index([orderId], map: "order_items_order_id_idx")
+  @@index([productId], map: "order_items_product_id_idx")
+  @@map("order_items")
+}
+
+enum ClientPointType {
+  AUTO_SHOP
+  SERVICE_STATION
+  WHOLESALE
+  RETAIL
+  OTHER
+}
+
+enum ClientPointStatus {
+  ACTIVE
+  PAUSED
+  LEAD
+  ARCHIVED
+}
+
+enum VisitStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum VisitResult {
+  ORDER_CREATED
+  NO_NEED
+  CLIENT_ABSENT
+  CALLBACK_REQUIRED
+  OTHER
+}
+
+enum OrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  IN_DELIVERY
+  COMPLETED
+  CANCELLED
 }

@@ -4,6 +4,18 @@ import { ApiClient } from '../src/lib/api'
 import { bootstrapAuthSession } from '../src/lib/bootstrap-auth'
 
 const originalFetch = globalThis.fetch
+const apiBaseUrl = 'https://api.test'
+const user = {
+  id: 'user_1',
+  email: 'user@example.com',
+  displayName: null,
+  role: 'SALES_REP',
+  telegramId: null,
+  telegramUsername: null,
+  telegramFirstName: null,
+  telegramLastName: null,
+  createdAt: '2026-05-11T00:00:00.000Z',
+}
 
 afterEach(() => {
   globalThis.fetch = originalFetch
@@ -32,12 +44,7 @@ test('ApiClient refreshes and retries authenticated requests with the new access
     if (path === '/api/auth/me') {
       return json(
         {
-          user: {
-            id: 'user_1',
-            email: 'user@example.com',
-            displayName: null,
-            createdAt: '2026-05-11T00:00:00.000Z',
-          },
+          user,
         },
         200,
       )
@@ -47,6 +54,7 @@ test('ApiClient refreshes and retries authenticated requests with the new access
   }
 
   const client = new ApiClient({
+    apiBaseUrl,
     getAccessToken: () => accessToken,
     setAccessToken: (nextAccessToken) => {
       accessToken = nextAccessToken
@@ -81,12 +89,7 @@ test('ApiClient shares one refresh across concurrent unauthorized requests', asy
     if (path === '/api/auth/me' && authorization === 'Bearer fresh-access-token') {
       return json(
         {
-          user: {
-            id: 'user_1',
-            email: 'user@example.com',
-            displayName: null,
-            createdAt: '2026-05-11T00:00:00.000Z',
-          },
+          user,
         },
         200,
       )
@@ -100,6 +103,7 @@ test('ApiClient shares one refresh across concurrent unauthorized requests', asy
   }
 
   const client = new ApiClient({
+    apiBaseUrl,
     getAccessToken: () => accessToken,
     setAccessToken: (nextAccessToken) => {
       accessToken = nextAccessToken
@@ -146,6 +150,7 @@ test('ApiClient clears session when refresh fails during an authenticated reques
   }
 
   const client = new ApiClient({
+    apiBaseUrl,
     getAccessToken: () => accessToken,
     setAccessToken: (nextAccessToken) => {
       accessToken = nextAccessToken
@@ -189,6 +194,7 @@ test('ApiClient preserves backend error status, code, and message', async () => 
   }
 
   const client = new ApiClient({
+    apiBaseUrl,
     getAccessToken: () => null,
     setAccessToken: () => undefined,
   })
@@ -222,6 +228,7 @@ test('ApiClient expireSession clears stale web session cookie through logout', a
   }
 
   const client = new ApiClient({
+    apiBaseUrl,
     getAccessToken: () => accessToken,
     setAccessToken: (nextAccessToken) => {
       accessToken = nextAccessToken

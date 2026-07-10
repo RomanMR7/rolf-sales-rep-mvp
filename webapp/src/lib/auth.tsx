@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import type { LoginRequest, RegisterRequest } from '@web-app-demo/contracts'
+import type { LoginRequest, RegisterRequest, TelegramAuthRequest } from '@rolf-sales-rep-mvp/contracts'
 import {
   type PropsWithChildren,
   useCallback,
@@ -15,6 +15,7 @@ import {
   useLoginMutation,
   useLogoutMutation,
   useRegisterMutation,
+  useTelegramAuthMutation,
 } from './auth-queries'
 import { AuthContext, type AuthContextValue } from './auth-context'
 import { bootstrapAuthSession } from './bootstrap-auth'
@@ -74,6 +75,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   })
   const { mutateAsync: registerAsync } = useRegisterMutation({ api, setAccessToken })
   const { mutateAsync: loginAsync } = useLoginMutation({ api, setAccessToken })
+  const { mutateAsync: telegramAuthAsync } = useTelegramAuthMutation({ api, setAccessToken })
   const { mutateAsync: logoutAsync } = useLogoutMutation({ api, setAccessToken })
 
   const register = useCallback(
@@ -90,6 +92,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [loginAsync],
   )
 
+  const telegramAuth = useCallback(
+    async (input: TelegramAuthRequest) => {
+      await telegramAuthAsync(input)
+    },
+    [telegramAuthAsync],
+  )
+
   const logout = useCallback(async () => {
     await logoutAsync()
   }, [logoutAsync])
@@ -101,9 +110,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       isAuthenticated: Boolean(meQuery.data?.user),
       register,
       login,
+      telegramAuth,
       logout,
+      api,
     }),
-    [isBootstrapping, login, logout, meQuery.data?.user, register],
+    [api, isBootstrapping, login, logout, meQuery.data?.user, register, telegramAuth],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

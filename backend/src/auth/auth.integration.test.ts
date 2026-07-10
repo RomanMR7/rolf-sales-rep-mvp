@@ -17,6 +17,7 @@ maybeDescribe('auth API integration', () => {
     ACCESS_TOKEN_TTL_SECONDS: 60,
     REFRESH_TOKEN_TTL_DAYS: 30,
     COOKIE_SECURE: false,
+  ALLOW_DEV_AUTH: false,
     SPACES_UPLOAD_MAX_BYTES: 10 * 1024 * 1024,
     SPACES_UPLOAD_URL_TTL_SECONDS: 900,
     SPACES_DOWNLOAD_URL_TTL_SECONDS: 300,
@@ -172,7 +173,7 @@ maybeDescribe('auth API integration', () => {
 
     expect(register.status).toBe(201)
     expect(registerBody.refreshToken).toBeUndefined()
-    expect(setCookie).toContain('web_app_demo_refresh=')
+    expect(setCookie).toContain('rolf_sales_rep_mvp_refresh=')
     expect(setCookie).toContain('HttpOnly')
     expect(setCookie).toContain('SameSite=Lax')
 
@@ -198,6 +199,7 @@ maybeDescribe('auth API integration', () => {
         ...env,
         CORS_ORIGINS: ['https://web.example.com'],
         COOKIE_SECURE: true,
+  ALLOW_DEV_AUTH: false,
       },
       prisma,
     })
@@ -220,7 +222,7 @@ maybeDescribe('auth API integration', () => {
     expect(register.headers.get('access-control-allow-origin')).toBe('https://web.example.com')
     expect(register.headers.get('access-control-allow-credentials')).toBe('true')
     expect(registerBody.refreshToken).toBeUndefined()
-    expect(setCookie).toContain('web_app_demo_refresh=')
+    expect(setCookie).toContain('rolf_sales_rep_mvp_refresh=')
     expect(setCookie).toContain('HttpOnly')
     expect(setCookie).toContain('Secure')
     expect(setCookie).toContain('SameSite=None')
@@ -232,6 +234,7 @@ maybeDescribe('auth API integration', () => {
         ...env,
         CORS_ORIGINS: ['https://web.example.com'],
         COOKIE_SECURE: true,
+  ALLOW_DEV_AUTH: false,
       },
       prisma,
     })

@@ -7,7 +7,8 @@ import {
   refreshRequestSchema,
   refreshResponseSchema,
   registerRequestSchema,
-} from '@web-app-demo/contracts'
+  telegramAuthRequestSchema,
+} from '@rolf-sales-rep-mvp/contracts'
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
@@ -17,8 +18,9 @@ import type { AppHonoEnv, AuthenticatedHonoEnv } from '../http/context'
 import { userDtoFromAuthenticatedUser } from '../http/context'
 import { AppError, validationErrorHook } from '../http/errors'
 import { requireAuth } from './middleware'
+import { resolveTelegramDevUser, verifyTelegramInitData } from './telegram'
 
-const refreshCookieName = 'web_app_demo_refresh'
+const refreshCookieName = 'rolf_sales_rep_mvp_refresh'
 
 const authResponseContent = {
   'application/json': {
@@ -96,6 +98,38 @@ const loginRoute = createRoute({
     401: {
       content: errorResponseContent,
       description: 'Invalid credentials',
+    },
+  },
+})
+
+const telegramRoute = createRoute({
+  method: 'post',
+  path: '/telegram',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: telegramAuthRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: authResponseContent,
+      description: 'Created session from Telegram Mini App initData',
+    },
+    400: {
+      content: errorResponseContent,
+      description: 'Invalid payload',
+    },
+    401: {
+      content: errorResponseContent,
+      description: 'Invalid Telegram initData',
+    },
+    403: {
+      content: errorResponseContent,
+      description: 'Telegram dev auth is disabled',
     },
   },
 })
@@ -195,6 +229,19 @@ export function createAuthRoutes() {
     const auth = c.get('authService')
     const env = c.get('env')
     const result = await auth.login(c.req.valid('json'), requestMetadata(c))
+    setRefreshCookie(c, result.refreshToken, env)
+
+    return c.json(responseForClient(c, result), 200)
+  })
+
+  routes.openapi(telegramRoute, async (c) => {
+    const auth = c.get('authService')
+    const env = c.get('env')
+    const body = c.req.valid('json')
+    const profile = body.initData
+      ? verifyTelegramInitData(body.initData, env)
+      : resolveTelegramDevUser(body.devUser!, env)
+    const result = await auth.loginWithTelegram(profile, requestMetadata(c))
     setRefreshCookie(c, result.refreshToken, env)
 
     return c.json(responseForClient(c, result), 200)

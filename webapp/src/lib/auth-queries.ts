@@ -9,7 +9,8 @@ import type {
   LoginRequest,
   MeResponse,
   RegisterRequest,
-} from '@web-app-demo/contracts'
+  TelegramAuthRequest,
+} from '@rolf-sales-rep-mvp/contracts'
 
 import type { ApiClient } from './api'
 
@@ -24,7 +25,7 @@ type CurrentUserQueryOptions = {
 }
 
 type AuthMutationOptions = {
-  api: Pick<ApiClient, 'login' | 'logout' | 'register'>
+  api: Pick<ApiClient, 'login' | 'logout' | 'register' | 'telegramAuth'>
   setAccessToken: (accessToken: string | null) => void
 }
 
@@ -58,6 +59,17 @@ export function useLoginMutation({ api, setAccessToken }: AuthMutationOptions) {
   })
 }
 
+export function useTelegramAuthMutation({ api, setAccessToken }: AuthMutationOptions) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: TelegramAuthRequest) => api.telegramAuth(input),
+    onSuccess: (response) => {
+      applyAuthenticatedSession(queryClient, setAccessToken, response)
+    },
+  })
+}
+
 export function useLogoutMutation({ api, setAccessToken }: AuthMutationOptions) {
   const queryClient = useQueryClient()
 
@@ -85,5 +97,5 @@ export function clearAuthenticatedSession(
   setAccessToken: (accessToken: string | null) => void,
 ) {
   setAccessToken(null)
-  queryClient.removeQueries({ queryKey: authQueryKeys.me() })
+  queryClient.clear()
 }

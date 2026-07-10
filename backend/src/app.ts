@@ -6,6 +6,7 @@ import type { DbClient } from './db'
 import type { AppEnv } from './env'
 import { createAuthRoutes } from './auth/routes'
 import { AuthService } from './auth/service'
+import { createBusinessRoutes } from './business/routes'
 import type { AppHonoEnv } from './http/context'
 import { errorResponse, handleError, validationErrorHook } from './http/errors'
 import { createStorageServiceFromEnv } from './storage/service'
@@ -31,7 +32,7 @@ export function createApp({ env, prisma }: CreateAppOptions) {
         return env.CORS_ORIGINS.includes(origin) ? origin : null
       },
       allowHeaders: ['Content-Type', 'Authorization', 'X-Client-Platform'],
-      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true,
       maxAge: 600,
     }),
@@ -45,7 +46,7 @@ export function createApp({ env, prisma }: CreateAppOptions) {
 
   app.get('/', (c) => {
     return c.json({
-      name: 'web_app_demo backend',
+      name: 'rolf_sales_rep_mvp backend',
       status: 'ok',
     })
   })
@@ -57,11 +58,12 @@ export function createApp({ env, prisma }: CreateAppOptions) {
   })
 
   app.route('/api/auth', createAuthRoutes())
+  app.route('/api', createBusinessRoutes(prisma))
 
   app.doc('/openapi.json', {
     openapi: '3.0.0',
     info: {
-      title: 'web_app_demo API',
+      title: 'rolf_sales_rep_mvp API',
       version: '1.0.0',
     },
   })

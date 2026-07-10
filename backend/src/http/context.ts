@@ -1,4 +1,4 @@
-import type { UserDto } from '@web-app-demo/contracts'
+import type { UserDto } from '@rolf-sales-rep-mvp/contracts'
 
 import type { AppEnv } from '../env'
 import type { AuthService } from '../auth/service'
