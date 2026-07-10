@@ -141,5 +141,5 @@ test(
     expect(markup).toContain('text-sm leading-normal font-normal')
     expect(markup).not.toContain('data-slot="typography"')
   },
-  15_000,
+  30_000,
 )

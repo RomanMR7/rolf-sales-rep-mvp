@@ -481,8 +481,19 @@ function TelegramAuthScreen() {
           <Separator />
           <div className="grid gap-3">
             <Typography variant="h6">Demo email login</Typography>
-            <input className="h-10 rounded-md border bg-background px-3" value={email} onChange={(event) => setEmail(event.target.value)} />
-            <input className="h-10 rounded-md border bg-background px-3" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <input
+              aria-label="Demo email"
+              className="h-10 rounded-md border bg-background px-3"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <input
+              aria-label="Demo password"
+              className="h-10 rounded-md border bg-background px-3"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
             <Button className="w-fit" disabled={isSubmitting} onClick={() => void submit(() => auth.login({ email, password }))}>
               Войти как demo user
             </Button>

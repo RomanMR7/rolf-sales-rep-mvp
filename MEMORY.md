@@ -647,3 +647,10 @@ CI follow-up:
   `bun test webapp/tests/api.test.ts webapp/tests/auth-queries.test.ts webapp/tests/e2e-env.test.ts`,
   `bun run --cwd backend typecheck`, `bun run test:contracts`,
   `bun run smoke:backend:docker`, and `bun run test`.
+* GitHub Actions for `de454e2` then passed typecheck/unit/backend/webapp steps but failed on stale `Webapp E2E smoke`.
+* Local E2E initially failed because local proxy env (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`) returned 503 for unused localhost ports; running with `NO_PROXY=127.0.0.1,localhost` and cleared proxy env exposed the real stale spec.
+* Updated `webapp/e2e/specs/auth.spec.ts` for the current Mini App demo login UI: create a unique test user via backend API, verify wrong password, login through the visible form, verify refresh-cookie restore, logout, and login again.
+* Added `aria-label` values to the demo email/password inputs in `webapp/src/pages.tsx`.
+* Increased the heavy runtime typography render smoke timeout to 30 seconds to avoid cold-import flakiness after long typography-policy runs.
+* Final E2E passed locally with proxy disabled for localhost.
+* Final requested validation passed again, including `bun run smoke:backend:docker` and `bun run test`.
