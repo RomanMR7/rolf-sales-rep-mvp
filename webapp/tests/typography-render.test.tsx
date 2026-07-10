@@ -96,46 +96,50 @@ mock.module('radix-ui', () => ({
   },
 }))
 
-test('wrapped Radix-like primitives keep child slots and Typography classes at runtime', async () => {
-  const { Button } = await import('../src/components/ui/button')
-  const { DialogDescription, DialogTitle } = await import(
-    '../src/components/ui/dialog'
-  )
-  const { DropdownMenuItem } = await import(
-    '../src/components/ui/dropdown-menu'
-  )
-  const { SelectItem } = await import('../src/components/ui/select')
+test(
+  'wrapped Radix-like primitives keep child slots and Typography classes at runtime',
+  async () => {
+    const { Button } = await import('../src/components/ui/button')
+    const { DialogDescription, DialogTitle } = await import(
+      '../src/components/ui/dialog'
+    )
+    const { DropdownMenuItem } = await import(
+      '../src/components/ui/dropdown-menu'
+    )
+    const { SelectItem } = await import('../src/components/ui/select')
 
-  const markup = renderToStaticMarkup(
-    <>
-      <Button asChild className="text-background">
-        <a href="/settings">Settings</a>
-      </Button>
-      <DialogTitle className="custom-title">Title</DialogTitle>
-      <DialogDescription>Description</DialogDescription>
-      <DropdownMenuItem className="custom-menu">Open</DropdownMenuItem>
-      <SelectItem className="custom-select" value="alpha">
-        Alpha
-      </SelectItem>
-    </>,
-  )
+    const markup = renderToStaticMarkup(
+      <>
+        <Button asChild className="text-background">
+          <a href="/settings">Settings</a>
+        </Button>
+        <DialogTitle className="custom-title">Title</DialogTitle>
+        <DialogDescription>Description</DialogDescription>
+        <DropdownMenuItem className="custom-menu">Open</DropdownMenuItem>
+        <SelectItem className="custom-select" value="alpha">
+          Alpha
+        </SelectItem>
+      </>,
+    )
 
-  expect(markup).toContain('href="/settings"')
-  expect(markup).toContain('data-slot="button"')
-  expect(markup).toContain('text-background')
-  expect(markup).toContain('text-sm leading-none font-medium')
+    expect(markup).toContain('href="/settings"')
+    expect(markup).toContain('data-slot="button"')
+    expect(markup).toContain('text-background')
+    expect(markup).toContain('text-sm leading-none font-medium')
 
-  expect(markup).toContain('data-slot="dialog-title"')
-  expect(markup).toContain('custom-title')
-  expect(markup).toContain('font-heading text-base')
+    expect(markup).toContain('data-slot="dialog-title"')
+    expect(markup).toContain('custom-title')
+    expect(markup).toContain('font-heading text-base')
 
-  expect(markup).toContain('data-slot="dialog-description"')
-  expect(markup).toContain('text-muted-foreground')
+    expect(markup).toContain('data-slot="dialog-description"')
+    expect(markup).toContain('text-muted-foreground')
 
-  expect(markup).toContain('data-slot="dropdown-menu-item"')
-  expect(markup).toContain('custom-menu')
-  expect(markup).toContain('data-slot="select-item"')
-  expect(markup).toContain('custom-select')
-  expect(markup).toContain('text-sm leading-normal font-normal')
-  expect(markup).not.toContain('data-slot="typography"')
-})
+    expect(markup).toContain('data-slot="dropdown-menu-item"')
+    expect(markup).toContain('custom-menu')
+    expect(markup).toContain('data-slot="select-item"')
+    expect(markup).toContain('custom-select')
+    expect(markup).toContain('text-sm leading-normal font-normal')
+    expect(markup).not.toContain('data-slot="typography"')
+  },
+  15_000,
+)

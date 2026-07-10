@@ -13,7 +13,11 @@ describe('loadEnv', () => {
     expect(env.PORT).toBe(3000)
     expect(env.ACCESS_TOKEN_TTL_SECONDS).toBe(900)
     expect(env.COOKIE_SECURE).toBe(false)
-    expect(env.CORS_ORIGINS).toEqual(['http://localhost:5173', 'http://localhost:8081'])
+    expect(env.CORS_ORIGINS).toEqual([
+      'http://localhost:5173',
+      'http://localhost:8081',
+      'https://rolf-sales-rep-mvp-webapp.vercel.app',
+    ])
     expect(env.SPACES_REGION).toBeUndefined()
     expect(env.SPACES_UPLOAD_MAX_BYTES).toBe(10 * 1024 * 1024)
     expect(env.SPACES_UPLOAD_URL_TTL_SECONDS).toBe(900)
@@ -78,33 +82,37 @@ describe('loadEnv', () => {
       JWT_SECRET: '12345678901234567890123456789012',
     }
 
-    expect(() =>
-      loadEnv({
+    for (const corsOrigins of ['', '*', 'https://web.example.com/path']) {
+      const env = loadEnv({
         ...baseEnv,
-        CORS_ORIGINS: '',
-      }),
-    ).toThrow('CORS_ORIGINS')
+        NODE_ENV: 'production',
+        CORS_ORIGINS: corsOrigins,
+      })
 
-    expect(() =>
-      loadEnv({
-        ...baseEnv,
-        CORS_ORIGINS: '*',
-      }),
-    ).toThrow('CORS_ORIGINS')
+      expect(env.CORS_ORIGINS).toEqual(['https://rolf-sales-rep-mvp-webapp.vercel.app'])
+    }
 
-    expect(() =>
-      loadEnv({
-        ...baseEnv,
-        CORS_ORIGINS: 'https://web.example.com/path',
-      }),
-    ).toThrow('CORS_ORIGINS')
+    const env = loadEnv({
+      ...baseEnv,
+      COOKIE_SECURE: 'true',
+      CORS_ORIGINS: 'http://web.example.com,https://web.example.com',
+    })
 
-    expect(() =>
-      loadEnv({
-        ...baseEnv,
-        COOKIE_SECURE: 'true',
-        CORS_ORIGINS: 'http://web.example.com',
-      }),
-    ).toThrow('CORS_ORIGINS')
+    expect(env.CORS_ORIGINS).toEqual([
+      'https://web.example.com',
+      'https://rolf-sales-rep-mvp-webapp.vercel.app',
+    ])
+  })
+
+  test('production CORS allowlist includes the Vercel frontend origin', () => {
+    const env = loadEnv({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://superuser:superpassword@localhost:54329/rolf_sales_rep_mvp',
+      JWT_SECRET: '12345678901234567890123456789012',
+      CORS_ORIGINS: 'https://admin.example.com',
+    })
+
+    expect(env.CORS_ORIGINS).toContain('https://rolf-sales-rep-mvp-webapp.vercel.app')
+    expect(env.CORS_ORIGINS).not.toContain('*')
   })
 })

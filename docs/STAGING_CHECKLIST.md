@@ -5,10 +5,13 @@ Use this checklist before showing the MVP through Telegram.
 ## Frontend
 
 - Vercel deploy successful.
-- `VITE_API_URL` points to the public HTTPS backend.
+- `VITE_API_URL` may point to the public HTTPS backend, but it is optional for this staging MVP.
+- If `VITE_API_URL` is missing, empty, invalid, or fails with `Failed to fetch`, the webapp uses the public Render fallback `https://rolf-sales-rep-mvp-backend.onrender.com`.
+- Browser dev console shows `[api] API base selection` and, when needed, `[api] API base selected after retry`.
 - Webapp opens by HTTPS.
 - Login screen renders.
-- Production frontend has no localhost backend fallback.
+- Production frontend has no localhost backend fallback and no user-facing `VITE_API_URL is not configured` error.
+- Demo login works from Vercel with `rep1@rolf-demo.local` / `DemoPass123!`.
 - Telegram WebApp detection works inside Telegram.
 - `window.Telegram.WebApp` exists inside Telegram WebView.
 - `initData` is present inside Telegram WebView.
@@ -21,8 +24,9 @@ Use this checklist before showing the MVP through Telegram.
 - `GET /health` returns 200.
 - `GET /openapi.json` returns 200.
 - `POST /api/auth/login` works for seeded demo users if email/password demo auth is enabled for staging.
+- `OPTIONS /api/auth/login` passes from `https://rolf-sales-rep-mvp-webapp.vercel.app`.
 - `POST /api/auth/telegram` works with real Telegram `initData`.
-- `CORS_ORIGINS` includes the exact Vercel URL.
+- `CORS_ORIGINS` includes the exact Vercel URL, or backend fallback allowlist adds `https://rolf-sales-rep-mvp-webapp.vercel.app` safely.
 - `COOKIE_SECURE=true`.
 - `ALLOW_DEV_AUTH=false`.
 - `TELEGRAM_BOT_TOKEN` is configured in secret/env storage.

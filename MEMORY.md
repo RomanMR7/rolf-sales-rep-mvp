@@ -445,7 +445,7 @@ Validation:
   `Backend listening on http://0.0.0.0:10000/`
 * Vercel URL opened with HTTP 200.
 * Vercel bundle did not contain `localhost:3000`.
-* Vercel bundle did not contain a Render backend URL yet, so Vercel still needs `VITE_API_URL` set after Render backend URL exists and then redeployed.
+* Superseded later: Vercel no longer needs `VITE_API_URL` for this MVP because the frontend now has a public Render fallback.
 
 Access limitations:
 
@@ -459,9 +459,8 @@ Manual next steps:
 * Fill Render env:
   `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`; verify generated `JWT_SECRET`; keep `ALLOW_DEV_AUTH=false`.
 * Deploy backend and copy `https://...onrender.com`.
-* Run staging migrations with `bun run --cwd backend prisma:deploy`.
-* Load demo seed with `bun run seed`.
-* In Vercel, set `VITE_API_URL=https://...onrender.com` and redeploy.
+* Superseded later: migrations and seed are automatic during Render container startup.
+* Superseded later: Vercel `VITE_API_URL` is optional because the frontend has a public Render fallback.
 * In BotFather, set Mini App URL to `https://rolf-sales-rep-mvp-webapp.vercel.app`.
 
 ## Live Staging Check - 2026-07-10
@@ -478,8 +477,8 @@ Live checks:
 * Render backend `/openapi.json` returned 200.
 * Vercel frontend returned 200.
 * Vercel frontend bundle does not contain `localhost:3000`.
-* Vercel frontend bundle does not yet contain `https://rolf-sales-rep-mvp-backend.onrender.com`, so Vercel env `VITE_API_URL` still needs to be set and frontend redeployed.
-* Backend demo login `POST /api/auth/login` for `rep1@rolf-demo.local` returned 500, likely because staging migrations/seed are not applied yet or Render DB env is not fully connected.
+* Superseded later: the frontend bundle now contains `https://rolf-sales-rep-mvp-backend.onrender.com` as a public API fallback.
+* Superseded later: backend demo login `POST /api/auth/login` for `rep1@rolf-demo.local` returned 200 in live checks.
 
 Render/Vercel access:
 
@@ -566,4 +565,50 @@ Validation:
 * `bun run --cwd backend test:unit` passed.
 * `bun run smoke:backend:docker` passed, including clean PostgreSQL 18 startup, repeated startup, visible connection failure diagnostics, and visible migration wrapper failure diagnostics.
 * `bun run test:webapp` passed after one flaky 5-second typography render timeout.
+* Final `bun run test` passed.
+
+## Production Frontend API Fallback Fix - 2026-07-10
+
+User correction:
+
+* Production Vercel frontend must not critically depend on manually configured `VITE_API_URL`.
+* Do not suggest editing the locked/Sensitive Vercel env var as the required fix.
+* Public Render backend URL is not secret and may be stored as a staging fallback:
+  `https://rolf-sales-rep-mvp-backend.onrender.com`.
+
+Frontend fix:
+
+* Added centralized API base resolution in `webapp/src/lib/apiConfig.ts`.
+* `VITE_API_URL` is used only when it is present and a valid `http` or `https` URL.
+* Missing, empty, invalid, or failed primary API base falls back to
+  `https://rolf-sales-rep-mvp-backend.onrender.com`.
+* API URLs are normalized to remove trailing slashes.
+* Login and all API requests retry the fallback when the first base URL fails with a browser network error such as `Failed to fetch`.
+* User-facing `VITE_API_URL is not configured` error was removed.
+* Dev console diagnostics show selected API base and fallback retry without printing tokens, cookies, or secrets.
+
+Backend CORS fix:
+
+* Backend env loading now includes a safe built-in allowlist fallback for
+  `https://rolf-sales-rep-mvp-webapp.vercel.app`.
+* Invalid, wildcard, path-bearing, or HTTP CORS values are filtered instead of opening CORS to `*`.
+* Credentials remain enabled only for explicit origins.
+
+Live checks:
+
+* `GET /health` on Render returned 200 with Vercel origin CORS headers.
+* `OPTIONS /api/auth/login` from the Vercel origin returned 204 with credentials CORS headers.
+* Demo login `rep1@rolf-demo.local` with `DemoPass123!` returned 200 from the live backend; do not print returned tokens or cookies.
+
+Validation:
+
+* `bun run --cwd webapp build` passed.
+* `bun run --cwd webapp typecheck` passed.
+* `bun test webapp/tests/api.test.ts webapp/tests/auth-queries.test.ts webapp/tests/e2e-env.test.ts` passed.
+* `bun run --cwd backend typecheck` passed.
+* `bun run test:contracts` passed.
+* `bun run smoke:backend:docker` passed.
+* First full `bun run test` run passed all deploy, contracts, backend, integration, and API tests, then hit the existing flaky 5-second `typography-render.test.tsx` timeout.
+* Stabilized `webapp/tests/typography-render.test.tsx` by giving its heavy runtime UI import/render smoke a 15-second timeout.
+* Final `bun run --cwd webapp test` passed: 42 pass, 0 fail.
 * Final `bun run test` passed.

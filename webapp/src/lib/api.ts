@@ -39,10 +39,15 @@ import {
 } from '@rolf-sales-rep-mvp/contracts'
 import type { z } from 'zod'
 
-const apiBaseUrl = import.meta.env?.VITE_API_URL?.replace(/\/$/, '')
+import {
+  logApiBaseSelection,
+  normalizeApiBaseUrl,
+  resolveApiBaseUrls,
+} from './apiConfig'
 
 type ApiClientOptions = {
   apiBaseUrl?: string
+  fallbackApiBaseUrl?: string
   getAccessToken: () => string | null
   setAccessToken: (accessToken: string | null) => void
   onAuthExpired?: () => void | Promise<void>
@@ -70,9 +75,17 @@ export class ApiRequestError extends Error {
 export class ApiClient {
   private readonly options: ApiClientOptions
   private refreshPromise: Promise<RefreshResponse> | null = null
+  private activeApiBaseUrl: string | null = null
+  private readonly configuredApiBaseUrls: string[]
 
   constructor(options: ApiClientOptions) {
     this.options = options
+    const resolved = resolveApiBaseUrls(
+      options.apiBaseUrl ?? import.meta.env?.VITE_API_URL,
+      options.fallbackApiBaseUrl,
+    )
+    this.configuredApiBaseUrls = resolved.urls
+    logApiBaseSelection(this.configuredApiBaseUrls, resolved.reason)
   }
 
   register(input: RegisterRequest): Promise<AuthResponse> {
@@ -235,17 +248,43 @@ export class ApiClient {
   }
 
   private async rawRequest(path: string, options: RequestOptions): Promise<Response> {
-    const baseUrl = this.options.apiBaseUrl?.replace(/\/$/, '') ?? apiBaseUrl
-    if (!baseUrl) {
-      throw new ApiRequestError(0, 'CONFIGURATION_ERROR', 'VITE_API_URL is not configured')
+    const checkedUrls = this.requestBaseUrls()
+    let lastNetworkError: unknown = null
+    let response: Response | null = null
+
+    for (const baseUrl of checkedUrls) {
+      try {
+        response = await fetch(`${baseUrl}${path}`, {
+          method: options.method ?? 'GET',
+          credentials: 'include',
+          headers: this.headers(options),
+          body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        })
+        this.activeApiBaseUrl = baseUrl
+        break
+      } catch (error) {
+        lastNetworkError = error
+        console.warn('[api] API request failed; trying next base URL if available', {
+          baseUrl,
+          path,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
 
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: options.method ?? 'GET',
-      credentials: 'include',
-      headers: this.headers(options),
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    })
+    if (!response) {
+      throw new ApiRequestError(
+        0,
+        'BACKEND_UNREACHABLE',
+        `Backend is unreachable. Checked: ${checkedUrls.join(', ')}`,
+      )
+    }
+
+    if (lastNetworkError && this.activeApiBaseUrl) {
+      console.info('[api] API base selected after retry', {
+        baseUrl: this.activeApiBaseUrl,
+      })
+    }
 
     if (response.status === 401 && options.auth && options.retryOnUnauthorized !== false) {
       const refreshed = await this.refreshOnce().catch(async (error: unknown) => {
@@ -265,6 +304,18 @@ export class ApiClient {
     }
 
     return response
+  }
+
+  private requestBaseUrls() {
+    const urls = this.activeApiBaseUrl
+      ? [this.activeApiBaseUrl, ...this.configuredApiBaseUrls]
+      : this.configuredApiBaseUrls
+
+    const normalizedUrls = urls
+      .map((url) => normalizeApiBaseUrl(url))
+      .filter((url): url is string => url !== null)
+
+    return [...new Set(normalizedUrls)]
   }
 
   private refreshOnce() {

@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 
 import { ApiClient } from '../src/lib/api'
+import { productionApiFallbackUrl, resolveApiBaseUrls } from '../src/lib/apiConfig'
 import { bootstrapAuthSession } from '../src/lib/bootstrap-auth'
 
 const originalFetch = globalThis.fetch
@@ -19,6 +20,110 @@ const user = {
 
 afterEach(() => {
   globalThis.fetch = originalFetch
+})
+
+test('API config uses Render fallback when VITE_API_URL is missing or invalid', () => {
+  expect(resolveApiBaseUrls(undefined).urls).toEqual([productionApiFallbackUrl])
+  expect(resolveApiBaseUrls('').urls).toEqual([productionApiFallbackUrl])
+  expect(resolveApiBaseUrls('not-a-url').urls).toEqual([productionApiFallbackUrl])
+})
+
+test('API config normalizes trailing slashes and keeps fallback as secondary base', () => {
+  expect(resolveApiBaseUrls('https://primary.example.com///').urls).toEqual([
+    'https://primary.example.com',
+    productionApiFallbackUrl,
+  ])
+})
+
+test('ApiClient retries the production fallback when the first API base has a network error', async () => {
+  const calls: string[] = []
+
+  globalThis.fetch = async (input) => {
+    const url = String(input)
+    calls.push(url)
+
+    if (url.startsWith('https://broken.example.com')) {
+      throw new TypeError('Failed to fetch')
+    }
+
+    return json(
+      {
+        user,
+        accessToken: 'fallback-access-token',
+      },
+      200,
+    )
+  }
+
+  const client = new ApiClient({
+    apiBaseUrl: 'https://broken.example.com/',
+    fallbackApiBaseUrl: productionApiFallbackUrl,
+    getAccessToken: () => null,
+    setAccessToken: () => undefined,
+  })
+
+  const response = await client.login({
+    email: 'rep1@rolf-demo.local',
+    password: 'DemoPass123!',
+  })
+
+  expect(response.accessToken).toBe('fallback-access-token')
+  expect(calls).toEqual([
+    'https://broken.example.com/api/auth/login',
+    `${productionApiFallbackUrl}/api/auth/login`,
+  ])
+})
+
+test('ApiClient reports checked API bases when all network attempts fail', async () => {
+  globalThis.fetch = async () => {
+    throw new TypeError('Failed to fetch')
+  }
+
+  const client = new ApiClient({
+    apiBaseUrl: 'https://broken.example.com/',
+    fallbackApiBaseUrl: productionApiFallbackUrl,
+    getAccessToken: () => null,
+    setAccessToken: () => undefined,
+  })
+
+  await expect(
+    client.login({
+      email: 'rep1@rolf-demo.local',
+      password: 'DemoPass123!',
+    }),
+  ).rejects.toMatchObject({
+    status: 0,
+    code: 'BACKEND_UNREACHABLE',
+    message: `Backend is unreachable. Checked: https://broken.example.com, ${productionApiFallbackUrl}`,
+  })
+})
+
+test('ApiClient login uses the resolved base URL without duplicate slashes', async () => {
+  const calls: string[] = []
+
+  globalThis.fetch = async (input) => {
+    calls.push(String(input))
+    return json(
+      {
+        user,
+        accessToken: 'login-access-token',
+      },
+      200,
+    )
+  }
+
+  const client = new ApiClient({
+    apiBaseUrl: 'https://api.test/',
+    getAccessToken: () => null,
+    setAccessToken: () => undefined,
+  })
+
+  await client.login({
+    email: 'rep1@rolf-demo.local',
+    password: 'DemoPass123!',
+  })
+
+  expect(calls).toEqual(['https://api.test/api/auth/login'])
 })
 
 test('ApiClient refreshes and retries authenticated requests with the new access token', async () => {

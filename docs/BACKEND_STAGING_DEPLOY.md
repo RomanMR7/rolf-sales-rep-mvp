@@ -58,7 +58,7 @@ The repository includes `render.yaml` for a Render Blueprint.
    - `Seed completed.`
    - `Starting backend...`
 8. Copy the generated public backend URL.
-9. Use that URL as Vercel `VITE_API_URL`.
+9. Confirm it matches the frontend fallback or set it as optional Vercel `VITE_API_URL` for a future backend URL override.
 
 Render Blueprint notes:
 
@@ -133,15 +133,21 @@ Use the same Docker shape:
 
 ## Vercel Connection
 
-After backend deploy, set this in Vercel:
+The frontend has a public production fallback for the current Render backend:
+
+```text
+https://rolf-sales-rep-mvp-backend.onrender.com
+```
+
+`VITE_API_URL` is now optional. If it is set to a valid URL, the frontend tries it first. If it is missing, empty, invalid, or the browser request fails with a network error, the frontend retries the Render fallback. This means the Vercel MVP no longer depends on changing a locked Sensitive `VITE_API_URL` variable.
+
+Only set this in Vercel when intentionally overriding the fallback:
 
 ```env
 VITE_API_URL=https://your-public-backend-url
 ```
 
 Then redeploy the Vercel frontend.
-
-Current Vercel deployment was reachable, but the built bundle did not contain a Render backend URL yet. After Render creates the backend URL, Vercel must be updated and redeployed.
 
 For this project, Render backend env should use:
 

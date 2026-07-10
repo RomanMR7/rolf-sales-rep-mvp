@@ -47,9 +47,15 @@ Vercel project settings:
 - Install Command: `bun install`
 - Build Command: `bun run build`
 - Output Directory: `dist`
-- Environment Variable: `VITE_API_URL=https://your-backend-url.example.com`
+- Optional Environment Variable: `VITE_API_URL=https://your-backend-url.example.com`
 
-The frontend API client reads the backend URL only from `VITE_API_URL`. Set this in Vercel before deploying. Do not rely on a localhost fallback in staging or production.
+The frontend API client resolves the backend URL centrally in `webapp/src/lib/apiConfig.ts`. If `VITE_API_URL` is present and valid, the client tries it first. If it is missing, empty, invalid, or fails with a browser network error such as `Failed to fetch`, the client uses the public staging fallback:
+
+```text
+https://rolf-sales-rep-mvp-backend.onrender.com
+```
+
+The fallback is intentionally public, contains no secrets, normalizes trailing slashes, and keeps the production Vercel app working even when the Vercel `VITE_API_URL` variable is absent or locked as Sensitive.
 
 ## Backend HTTPS Hosting
 
@@ -110,6 +116,7 @@ Production safety:
 - If `TELEGRAM_BOT_TOKEN` is missing, real Telegram auth returns a backend configuration error.
 - `COOKIE_SECURE=true` is required for HTTPS cookie auth.
 - `CORS_ORIGINS` must be exact HTTPS origins, never `*`, and must not include URL paths.
+- The backend has a safe built-in CORS fallback for `https://rolf-sales-rep-mvp-webapp.vercel.app`; keep explicit `CORS_ORIGINS` when possible, but do not use `*` with credentials.
 - Never commit `.env` files or secrets.
 
 Demo users after the automatic seed:

@@ -6,6 +6,13 @@ const booleanStringSchema = z
   .transform((value) => value === 'true')
 
 const knownWeakJwtSecrets = new Set(['replace-with-at-least-32-random-characters'])
+const productionVercelOrigin = 'https://rolf-sales-rep-mvp-webapp.vercel.app'
+const defaultCorsOrigins = [
+  'http://localhost:5173',
+  'http://localhost:8081',
+  'http://localhost:19006',
+  productionVercelOrigin,
+]
 
 const optionalStringSchema = z.preprocess((value) => {
   if (typeof value !== 'string') return value
@@ -33,13 +40,16 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   CORS_ORIGINS: z
     .string()
-    .default('http://localhost:5173,http://localhost:8081,http://localhost:19006')
-    .transform((value) =>
-      value
+    .default(defaultCorsOrigins.join(','))
+    .transform((value) => {
+      const origins = value
         .split(',')
         .map((origin) => origin.trim())
-        .filter(Boolean),
-    ),
+        .filter(Boolean)
+      const validOrigins = origins.filter((origin) => isSafeCorsOrigin(origin))
+
+      return [...new Set([...validOrigins, productionVercelOrigin])]
+    }),
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(15 * 60),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   COOKIE_SECURE: booleanStringSchema,
@@ -94,6 +104,23 @@ function isWeakJwtSecret(secret: string) {
 }
 
 function validateCorsOrigins(env: z.infer<typeof envSchema>, ctx: z.RefinementCtx) {
+  if (!env.CORS_ORIGINS.includes(productionVercelOrigin)) {
+    env.CORS_ORIGINS.push(productionVercelOrigin)
+  }
+
+  if (isProductionLikeRuntime(env)) {
+    env.CORS_ORIGINS = env.CORS_ORIGINS.filter((origin) => {
+      try {
+        return new URL(origin).protocol === 'https:'
+      } catch {
+        return false
+      }
+    })
+    if (!env.CORS_ORIGINS.includes(productionVercelOrigin)) {
+      env.CORS_ORIGINS.push(productionVercelOrigin)
+    }
+  }
+
   if (env.CORS_ORIGINS.length === 0) {
     ctx.addIssue({
       code: 'custom',
@@ -148,6 +175,17 @@ function validateCorsOrigins(env: z.infer<typeof envSchema>, ctx: z.RefinementCt
         message: `CORS_ORIGINS must use HTTPS when COOKIE_SECURE=true: ${origin}`,
       })
     }
+  }
+}
+
+function isSafeCorsOrigin(origin: string) {
+  if (origin === '*') return false
+
+  try {
+    const url = new URL(origin)
+    return ['http:', 'https:'].includes(url.protocol) && url.origin === origin
+  } catch {
+    return false
   }
 }
 
