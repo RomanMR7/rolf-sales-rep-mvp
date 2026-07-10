@@ -58,6 +58,19 @@ POST /api/auth/telegram
 
 15. Confirm the user is created or found by Telegram identity and lands on the sales rep dashboard.
 
+Short BotFather staging checklist:
+
+```text
+1. Open @BotFather
+2. /mybots
+3. Select bot
+4. Bot Settings
+5. Menu Button / Configure Mini App
+6. Set Mini App URL to Vercel URL
+7. Backend TELEGRAM_WEBAPP_URL must equal the same Vercel URL
+8. Backend CORS_ORIGINS must include the same Vercel URL
+```
+
 ## Vercel Settings
 
 Use Vercel for the Vite frontend only:

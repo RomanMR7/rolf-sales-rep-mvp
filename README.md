@@ -59,6 +59,24 @@ For a simple MVP staging setup:
 - Backend: Render, Railway, Fly.io, Yandex Cloud, or a VPS with HTTPS
 - Database: managed PostgreSQL
 
+Recommended first staging path:
+
+- Backend hosting: Render Docker web service
+- Database: Neon, Supabase, Render Postgres, Railway Postgres, or another managed PostgreSQL
+- Frontend: Vercel
+
+Render backend settings:
+
+- Root Directory: repository root
+- Runtime: Docker
+- Dockerfile: `backend/Dockerfile`
+- Docker Context: repository root `.`
+- Start Command: Dockerfile `CMD ["bun", "run", "start"]`
+- Health Check Path: `/health`
+- Port: provider `PORT` environment variable; the backend binds to `0.0.0.0`
+
+The repository includes `render.yaml` for Render Blueprint setup. See [Backend staging deploy](docs/BACKEND_STAGING_DEPLOY.md).
+
 Yandex Cloud option:
 
 - Frontend: Vercel
@@ -76,6 +94,15 @@ TELEGRAM_BOT_TOKEN=<bot-token-from-BotFather>
 TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp.vercel.app
 ALLOW_DEV_AUTH=false
 ```
+
+Staging database commands:
+
+```bash
+bun run --cwd backend prisma:deploy
+bun run seed
+```
+
+Use `bun run --cwd backend prisma:migrate` only for local development or when creating a new migration.
 
 Production safety:
 
@@ -173,6 +200,7 @@ Project docs:
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [MVP scope](docs/MVP_SCOPE.md)
 - [Client demo script](docs/CLIENT_DEMO_SCRIPT.md)
+- [Backend staging deploy](docs/BACKEND_STAGING_DEPLOY.md)
 - [Telegram setup](docs/TELEGRAM_SETUP.md)
 - [Staging checklist](docs/STAGING_CHECKLIST.md)
 - [Yandex Cloud ROLF MVP deployment](docs/YANDEX_CLOUD_ROLF_MVP.md)

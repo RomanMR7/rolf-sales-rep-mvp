@@ -355,3 +355,67 @@ Status:
 
 * Token prefix was not found in tracked files, git history, or working files.
 * `.env`, `backend/.env`, `webapp/.env`, `node_modules/`, `dist/`, `.scratch/`, `.vercel/`, and `coverage/` are ignored.
+
+## Backend Staging Deploy Readiness - 2026-07-10
+
+Scope:
+
+* Prepared backend staging deploy docs and helper files only.
+* Did not add business features or change the sales MVP flow.
+
+Recommended staging topology:
+
+* Telegram bot -> Vercel frontend -> Render backend -> managed PostgreSQL.
+* Alternatives remain Railway, Fly.io, Yandex Cloud, or VPS with HTTPS.
+
+Backend deploy shape:
+
+* Root Directory: repository root.
+* Runtime: Docker.
+* Dockerfile: `backend/Dockerfile`.
+* Docker Context: repository root `.`.
+* Start Command: Dockerfile `CMD ["bun", "run", "start"]`.
+* Health Check Path: `/health`.
+* Backend now explicitly binds to `0.0.0.0` and reads provider `PORT`.
+
+Files added/updated:
+
+* Added `render.yaml` Render Blueprint for Docker web service without secrets.
+* Added `docs/BACKEND_STAGING_DEPLOY.md`.
+* Updated `README.md` with backend Render settings, migration/seed commands, and doc link.
+* Updated `docs/STAGING_CHECKLIST.md` with backend deploy, DB, Telegram, and demo flow checks.
+* Updated `docs/TELEGRAM_SETUP.md` with short BotFather staging checklist.
+
+Backend env required:
+
+* `DATABASE_URL`
+* `JWT_SECRET`
+* `CORS_ORIGINS`
+* `COOKIE_SECURE=true`
+* `TELEGRAM_BOT_TOKEN`
+* `TELEGRAM_WEBAPP_URL`
+* `ALLOW_DEV_AUTH=false`
+
+Staging DB commands:
+
+* Apply existing migrations with `bun run --cwd backend prisma:deploy`.
+* Load demo data with `bun run seed` or `bun run --cwd backend seed`.
+* Use `bun run --cwd backend prisma:migrate` only for local/dev migration creation.
+
+Validation:
+
+* `bun run --cwd webapp build` passed.
+* `bun run --cwd webapp typecheck` passed.
+* `bun run --cwd backend typecheck` passed.
+* `bun run test:contracts` passed: 5 pass, 0 fail.
+* `bun run --cwd backend test:unit` passed: 32 pass, 0 fail.
+* `bun test webapp/tests/api.test.ts webapp/tests/auth-queries.test.ts webapp/tests/e2e-env.test.ts` passed: 14 pass, 0 fail.
+* Production webapp code still has no `localhost:3000` fallback.
+* Token prefix scan across working files found no matches.
+* `.env`, `backend/.env`, and `webapp/.env` remain ignored/not tracked.
+
+Notes:
+
+* Render Blueprint docs confirm `render.yaml` lives at repository root and supports Docker web services.
+* Render web services should bind to `0.0.0.0` and read provider `PORT`; backend now does that.
+* Changes are not committed unless the user explicitly asks.

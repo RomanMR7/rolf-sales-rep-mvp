@@ -5,6 +5,7 @@ const runtime = createBackendRuntime()
 const app = createApp({ env: runtime.env, prisma: runtime.prisma })
 
 const server = Bun.serve({
+  hostname: '0.0.0.0',
   port: runtime.env.PORT,
   fetch: app.fetch,
 })
