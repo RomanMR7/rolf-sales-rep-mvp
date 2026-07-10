@@ -15,12 +15,12 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        sync: false
+        value: https://rolf-sales-rep-mvp-webapp.vercel.app
       - key: COOKIE_SECURE
         value: "true"
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_WEBAPP_URL
-        sync: false
+        value: https://rolf-sales-rep-mvp-webapp.vercel.app
       - key: ALLOW_DEV_AUTH
         value: "false"

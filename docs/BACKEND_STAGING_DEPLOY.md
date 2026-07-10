@@ -8,6 +8,12 @@ Recommended MVP staging topology:
 Telegram bot -> Vercel frontend -> Render backend -> managed PostgreSQL
 ```
 
+Current Vercel frontend origin:
+
+```text
+https://rolf-sales-rep-mvp-webapp.vercel.app
+```
+
 Other acceptable backend hosts: Railway, Fly.io, Yandex Cloud, or a VPS with HTTPS.
 
 Do not commit real env values or secrets.
@@ -33,7 +39,7 @@ The repository includes `render.yaml` for a Render Blueprint.
 2. Create a new Blueprint from the GitHub repository.
 3. Select branch `main`.
 4. Confirm service `rolf-sales-rep-mvp-backend`.
-5. Fill all `sync: false` environment variables.
+5. Fill all `sync: false` environment variables: `DATABASE_URL` and `TELEGRAM_BOT_TOKEN`.
 6. Deploy the service.
 7. Copy the generated public backend URL.
 8. Use that URL as Vercel `VITE_API_URL`.
@@ -45,6 +51,7 @@ Render Blueprint notes:
 - `dockerContext: .`
 - `healthCheckPath: /health`
 - sensitive env values are not stored in git
+- current Vercel origin is already wired into `CORS_ORIGINS` and `TELEGRAM_WEBAPP_URL`
 
 ## Backend Environment
 
@@ -53,10 +60,10 @@ Set these on the backend hosting provider:
 ```env
 DATABASE_URL=postgresql://...
 JWT_SECRET=<random-32-plus-character-secret>
-CORS_ORIGINS=https://your-vercel-url.vercel.app
+CORS_ORIGINS=https://rolf-sales-rep-mvp-webapp.vercel.app
 COOKIE_SECURE=true
 TELEGRAM_BOT_TOKEN=<bot-token-from-BotFather>
-TELEGRAM_WEBAPP_URL=https://your-vercel-url.vercel.app
+TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
 ALLOW_DEV_AUTH=false
 ```
 
@@ -130,6 +137,21 @@ VITE_API_URL=https://your-public-backend-url
 ```
 
 Then redeploy the Vercel frontend.
+
+Current Vercel deployment was reachable, but the built bundle did not contain a Render backend URL yet. After Render creates the backend URL, Vercel must be updated and redeployed.
+
+For this project, Render backend env should use:
+
+```env
+CORS_ORIGINS=https://rolf-sales-rep-mvp-webapp.vercel.app
+TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
+```
+
+BotFather Mini App URL should be:
+
+```text
+https://rolf-sales-rep-mvp-webapp.vercel.app
+```
 
 ## Safety
 

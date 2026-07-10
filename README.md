@@ -77,6 +77,12 @@ Render backend settings:
 
 The repository includes `render.yaml` for Render Blueprint setup. See [Backend staging deploy](docs/BACKEND_STAGING_DEPLOY.md).
 
+Current Vercel frontend origin:
+
+```text
+https://rolf-sales-rep-mvp-webapp.vercel.app
+```
+
 Yandex Cloud option:
 
 - Frontend: Vercel
@@ -88,10 +94,10 @@ Required backend staging env:
 ```env
 DATABASE_URL=postgresql://...
 JWT_SECRET=<random-32-plus-character-secret>
-CORS_ORIGINS=https://rolf-sales-rep-mvp.vercel.app
+CORS_ORIGINS=https://rolf-sales-rep-mvp-webapp.vercel.app
 COOKIE_SECURE=true
 TELEGRAM_BOT_TOKEN=<bot-token-from-BotFather>
-TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp.vercel.app
+TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
 ALLOW_DEV_AUTH=false
 ```
 

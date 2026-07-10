@@ -74,7 +74,8 @@ Database setup checked:
 
 ## Manual Links To Fill
 
-- Vercel URL: `https://your-vercel-url.vercel.app`
+- Vercel URL: `https://rolf-sales-rep-mvp-webapp.vercel.app`
 - Backend URL: `https://your-public-backend-url`
+- Current Vercel URL: `https://rolf-sales-rep-mvp-webapp.vercel.app`
 - BotFather bot: `@your_bot_username`
 - Managed PostgreSQL provider: `Neon / Supabase / Render Postgres / Railway Postgres / other`

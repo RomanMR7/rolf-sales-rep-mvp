@@ -23,7 +23,7 @@ TELEGRAM_BOT_TOKEN=<token-from-BotFather>
 6. Copy the Vercel URL:
 
 ```text
-https://project-name.vercel.app
+https://rolf-sales-rep-mvp-webapp.vercel.app
 ```
 
 7. In BotFather open:
@@ -36,8 +36,8 @@ https://project-name.vercel.app
 9. Set backend env to the same frontend origin:
 
 ```env
-TELEGRAM_WEBAPP_URL=https://project-name.vercel.app
-CORS_ORIGINS=https://project-name.vercel.app
+TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
+CORS_ORIGINS=https://rolf-sales-rep-mvp-webapp.vercel.app
 ```
 
 10. Deploy or restart the backend with the updated env.
@@ -93,10 +93,10 @@ Staging/prod backend env:
 ```env
 DATABASE_URL=postgresql://...
 JWT_SECRET=<random-32-plus-character-secret>
-CORS_ORIGINS=https://project-name.vercel.app
+CORS_ORIGINS=https://rolf-sales-rep-mvp-webapp.vercel.app
 COOKIE_SECURE=true
 TELEGRAM_BOT_TOKEN=<token-from-BotFather>
-TELEGRAM_WEBAPP_URL=https://project-name.vercel.app
+TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
 ALLOW_DEV_AUTH=false
 ```
 
