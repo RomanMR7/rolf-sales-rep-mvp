@@ -76,13 +76,21 @@ async function main() {
   const savedUsers = new Map<string, { id: string }>()
 
   for (const user of users) {
-    const saved = await db.user.upsert({
+    const existingByEmail = await db.user.findUnique({
       where: { email: user.email },
-      update: user,
-      create: { ...user, passwordHash },
-      select: { id: true, email: true },
+      select: { id: true },
     })
-    savedUsers.set(saved.email, saved)
+    const existingByTelegramId = user.telegramId
+      ? await db.user.findUnique({
+          where: { telegramId: user.telegramId },
+          select: { id: true },
+        })
+      : null
+    const saved = existingByEmail ?? existingByTelegramId ?? await db.user.create({
+      data: { ...user, passwordHash },
+      select: { id: true },
+    })
+    savedUsers.set(user.email, saved)
   }
 
   const reps = users.filter((user) => user.role === UserRole.SALES_REP).map((user) => savedUsers.get(user.email)!)
@@ -91,7 +99,7 @@ async function main() {
   for (const [slug, name, description] of categories) {
     const saved = await db.productCategory.upsert({
       where: { slug },
-      update: { name, description },
+      update: {},
       create: { slug, name, description },
       select: { id: true, slug: true },
     })
@@ -102,7 +110,7 @@ async function main() {
   for (const [name, categorySlug, viscosity, volume, sku, basePrice, stock] of products) {
     savedProducts.push(await db.product.upsert({
       where: { sku },
-      update: { name, viscosity, volume, basePrice, stock, isActive: true },
+      update: {},
       create: {
         name,
         categoryId: savedCategories.get(categorySlug)!.id,
@@ -123,14 +131,7 @@ async function main() {
     const [name, type, city, address] = client
     savedClients.push(await db.clientPoint.upsert({
       where: { id: await stableId('client', index) },
-      update: {
-        name,
-        type,
-        city,
-        address,
-        assignedRepId: reps[index % reps.length].id,
-        status: index % 7 === 0 ? ClientPointStatus.LEAD : ClientPointStatus.ACTIVE,
-      },
+      update: {},
       create: {
         id: await stableId('client', index),
         name,
@@ -184,7 +185,7 @@ async function main() {
     const total = subtotal - discount
     const order = await db.order.upsert({
       where: { orderNumber: `DXB-${String(1001 + index)}` },
-      update: { status: orderStatuses[index % orderStatuses.length], subtotal, discount, total },
+      update: {},
       create: {
         orderNumber: `DXB-${String(1001 + index)}`,
         clientPointId: client.id,
@@ -198,12 +199,7 @@ async function main() {
     })
     await db.orderItem.upsert({
       where: { id: await stableId('order-item-a', index) },
-      update: {
-        quantity,
-        unitPrice: firstProduct.basePrice,
-        discount: 0,
-        lineTotal: lineOne,
-      },
+      update: {},
       create: {
           id: await stableId('order-item-a', index),
           orderId: order.id,
@@ -216,12 +212,7 @@ async function main() {
     })
     await db.orderItem.upsert({
       where: { id: await stableId('order-item-b', index) },
-      update: {
-        quantity: secondQuantity,
-        unitPrice: secondProduct.basePrice,
-        discount,
-        lineTotal: lineTwo - discount,
-      },
+      update: {},
       create: {
           id: await stableId('order-item-b', index),
           orderId: order.id,
@@ -234,7 +225,7 @@ async function main() {
     })
   }
 
-  console.log('Seed completed. Demo password:', password)
+  console.log('Seed data is ready.')
 }
 
 function startOfDay(date: Date) {

@@ -497,3 +497,39 @@ Additional Docker fix:
   `/health` 200, `/` 200, working directory `/app`.
 * Docker exec check passed:
   `bun run --cwd backend prisma:validate`.
+
+## Render Free Startup Deploy Fix - 2026-07-10
+
+User correction:
+
+* Render deployment is a Blueprint-managed Free Web Service.
+* Render Shell, One-Off Jobs, paid jobs, and Pre-Deploy Command are not available for this project.
+* Do not propose manual Render Shell commands for Prisma migrations or seed.
+
+Decision:
+
+* Backend Docker container now starts through `backend/scripts/render-start.sh`.
+* Container startup checks `DATABASE_URL`, runs `bun run --cwd backend prisma:deploy`, runs `bun run --cwd backend seed`, then starts backend with `bun run --cwd backend start:api`.
+* If `DATABASE_URL`, migrations, or seed fail, the container exits and backend does not start.
+* Startup logs include:
+  `Checking DATABASE_URL...`, `Running Prisma migrations...`, `Prisma migrations completed.`, `Running seed...`, `Seed completed.`, `Starting backend...`.
+
+Seed safety:
+
+* Seed is safe and idempotent for repeated deploy/restart.
+* Existing demo users, clients, categories, products, visits, orders, and order items are left untouched.
+* Seed creates only missing demo records and does not reset users or overwrite real data.
+
+Validation:
+
+* `bun run test` passed.
+* `bun run smoke:backend:docker` passed.
+* Docker smoke builds the backend image, starts on a clean test PostgreSQL volume, verifies startup logs, checks `/health`, runs a DB-backed auth smoke, restarts the container against the same DB, verifies startup logs again, and confirms idempotent restart.
+* Test runners now use free PostgreSQL test ports and reset only this repository's test compose volume to avoid stale or conflicting local volumes.
+* Pinned `@babel/types` to `7.29.7` because `7.29.0` installed without `validators/generated/index.js` and broke webapp typography tests.
+
+Docs updated:
+
+* `README.md`
+* `docs/BACKEND_STAGING_DEPLOY.md`
+* `docs/STAGING_CHECKLIST.md`

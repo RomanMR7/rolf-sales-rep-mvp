@@ -27,8 +27,14 @@ Use this checklist before showing the MVP through Telegram.
 - `ALLOW_DEV_AUTH=false`.
 - `TELEGRAM_BOT_TOKEN` is configured in secret/env storage.
 - `TELEGRAM_WEBAPP_URL` matches the Vercel Mini App URL.
-- Database migrations are applied.
-- Seed data is loaded if using demo staging.
+- Deploy logs show `Checking DATABASE_URL...`.
+- Deploy logs show `Running Prisma migrations...`.
+- Deploy logs show `Prisma migrations completed.`.
+- Deploy logs show `Running seed...`.
+- Deploy logs show `Seed completed.`.
+- Deploy logs show `Starting backend...`.
+- Database migrations are applied automatically by container startup.
+- Seed data is loaded automatically and safely if missing.
 
 Backend deploy settings checked:
 
@@ -36,16 +42,18 @@ Backend deploy settings checked:
 - Runtime: Docker.
 - Dockerfile: `backend/Dockerfile`.
 - Docker Context: repository root `.`.
-- Start Command: Dockerfile `CMD ["bun", "run", "--cwd", "backend", "start"]`.
+- Start Command: Dockerfile `CMD ["sh", "backend/scripts/render-start.sh"]`.
 - Health Check Path: `/health`.
 - Backend binds to `0.0.0.0` and reads provider `PORT`.
+- No Render Shell, One-Off Job, paid job, or Pre-Deploy Command is required.
 
 Database setup checked:
 
 - Managed PostgreSQL created.
 - `DATABASE_URL` copied into backend env.
-- Migrations applied with `bun run --cwd backend prisma:deploy`.
-- Demo seed loaded with `bun run seed` when using demo staging.
+- Migrations applied automatically during container startup.
+- Demo seed loaded automatically during container startup.
+- Repeated deploy/restart does not duplicate or overwrite existing demo or real data.
 
 ## Telegram
 
@@ -71,6 +79,7 @@ Database setup checked:
 - `CORS_ORIGINS` uses HTTPS origins only when `COOKIE_SECURE=true`.
 - Dev auth is disabled outside local development.
 - Real Telegram auth fails closed if `TELEGRAM_BOT_TOKEN` is missing.
+- Backend does not start if migrations or seed fail.
 
 ## Manual Links To Fill
 

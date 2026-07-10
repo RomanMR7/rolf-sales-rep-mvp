@@ -71,11 +71,11 @@ Render backend settings:
 - Runtime: Docker
 - Dockerfile: `backend/Dockerfile`
 - Docker Context: repository root `.`
-- Start Command: Dockerfile `CMD ["bun", "run", "--cwd", "backend", "start"]`
+- Start Command: Dockerfile `CMD ["sh", "backend/scripts/render-start.sh"]`
 - Health Check Path: `/health`
 - Port: provider `PORT` environment variable; the backend binds to `0.0.0.0`
 
-The repository includes `render.yaml` for Render Blueprint setup. See [Backend staging deploy](docs/BACKEND_STAGING_DEPLOY.md).
+The repository includes `render.yaml` for Render Blueprint setup on the Render Free Web Service plan. There is no Render Shell, One-Off Job, or Pre-Deploy Command requirement: every container start checks `DATABASE_URL`, applies Prisma migrations, runs the safe idempotent seed, and only then starts the backend. See [Backend staging deploy](docs/BACKEND_STAGING_DEPLOY.md).
 
 Current Vercel frontend origin:
 
@@ -101,14 +101,7 @@ TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
 ALLOW_DEV_AUTH=false
 ```
 
-Staging database commands:
-
-```bash
-bun run --cwd backend prisma:deploy
-bun run seed
-```
-
-Use `bun run --cwd backend prisma:migrate` only for local development or when creating a new migration.
+Staging database setup is automatic on Render. Do not run manual Render Shell commands. The Docker startup script runs `prisma migrate deploy` and the seed before the backend starts. Use `bun run --cwd backend prisma:migrate` only for local development or when creating a new migration.
 
 Production safety:
 
@@ -119,7 +112,7 @@ Production safety:
 - `CORS_ORIGINS` must be exact HTTPS origins, never `*`, and must not include URL paths.
 - Never commit `.env` files or secrets.
 
-Demo users after `bun run seed`:
+Demo users after the automatic seed:
 
 - Admin: `admin@rolf-demo.local`
 - Manager: `manager@rolf-demo.local`

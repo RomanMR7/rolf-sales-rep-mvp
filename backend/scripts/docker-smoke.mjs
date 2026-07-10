@@ -18,8 +18,7 @@ const containerName =
 const hostPort = process.env.BACKEND_DOCKER_SMOKE_PORT ?? String(await findOpenPort())
 const networkName = `${composeProjectName}_default`
 const composeArgs = ['compose', '-p', composeProjectName]
-const databaseUrlForHost =
-  process.env.TEST_DATABASE_URL ?? defaultTestDatabaseUrl(defaultPostgresTestPort)
+const databaseUrlForHost = await resolveTestDatabaseUrl()
 const databaseUrlForContainer =
   process.env.BACKEND_DOCKER_SMOKE_DATABASE_URL ??
   'postgresql://superuser:superpassword@postgres_test:5432/rolf_sales_rep_mvp_test?schema=public'
@@ -30,6 +29,14 @@ assertTestDatabaseUrl(databaseUrlForContainer, {
 const dockerEnv = composeEnv({
   POSTGRES_TEST_PORT: postgresPortFromDatabaseUrl(databaseUrlForHost),
 })
+const expectedStartupLogs = [
+  'Checking DATABASE_URL...',
+  'Running Prisma migrations...',
+  'Prisma migrations completed.',
+  'Running seed...',
+  'Seed completed.',
+  'Starting backend...',
+]
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -41,6 +48,15 @@ function run(command, args, options = {}) {
   if (result.status !== 0) {
     process.exit(result.status ?? 1)
   }
+}
+
+async function resolveTestDatabaseUrl() {
+  const exampleDatabaseUrl = defaultTestDatabaseUrl('54330')
+  if (process.env.TEST_DATABASE_URL && process.env.TEST_DATABASE_URL !== exampleDatabaseUrl) {
+    return process.env.TEST_DATABASE_URL
+  }
+
+  return defaultTestDatabaseUrl(String(await findOpenPort()))
 }
 
 function findOpenPort() {
@@ -156,20 +172,14 @@ async function smokeAuthApi() {
   process.stdout.write('Backend Docker DB-backed auth smoke passed\n')
 }
 
+run('docker', [...composeArgs, 'down', '--volumes', '--remove-orphans'], { env: dockerEnv })
 run('docker', [...composeArgs, 'up', '-d', 'postgres_test'], { env: dockerEnv })
 await waitForComposePostgres()
-
-run('bun', ['run', '--cwd', 'backend', 'prisma:deploy'], {
-  env: {
-    ...process.env,
-    DATABASE_URL: databaseUrlForHost,
-  },
-})
 
 run('docker', ['build', '-f', 'backend/Dockerfile', '-t', imageName, '.'])
 spawnSync('docker', ['rm', '-f', containerName], { stdio: 'ignore' })
 
-try {
+function runBackendContainer() {
   run('docker', [
     'run',
     '--rm',
@@ -192,9 +202,42 @@ try {
     'COOKIE_SECURE=false',
     imageName,
   ])
+}
 
+function assertStartupLogs() {
+  const result = spawnSync('docker', ['logs', containerName], {
+    encoding: 'utf8',
+  })
+
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr)
+    process.exit(result.status ?? 1)
+  }
+
+  const logs = `${result.stdout}\n${result.stderr}`
+  for (const expectedLog of expectedStartupLogs) {
+    if (!logs.includes(expectedLog)) {
+      process.stderr.write(`Backend Docker startup log did not include: ${expectedLog}\n`)
+      process.stderr.write(logs)
+      process.exit(1)
+    }
+  }
+
+  process.stdout.write('Backend Docker startup logs smoke passed\n')
+}
+
+try {
+  runBackendContainer()
   await waitForHealth()
+  assertStartupLogs()
   await smokeAuthApi()
+  spawnSync('docker', ['rm', '-f', containerName], { stdio: 'ignore' })
+
+  process.stdout.write('Restarting backend Docker smoke container to verify idempotent startup\n')
+  runBackendContainer()
+  await waitForHealth()
+  assertStartupLogs()
+  process.stdout.write('Backend Docker idempotent restart smoke passed\n')
 } finally {
   spawnSync('docker', ['rm', '-f', containerName], { stdio: 'ignore' })
 }

@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { createServer } from 'node:net'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -11,7 +12,7 @@ import {
 
 const backendRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const repositoryRoot = resolve(backendRoot, '..')
-const databaseUrl = process.env.TEST_DATABASE_URL ?? defaultTestDatabaseUrl()
+const databaseUrl = await resolveTestDatabaseUrl()
 assertTestDatabaseUrl(databaseUrl)
 const dockerEnv = composeEnv({
   POSTGRES_TEST_PORT: postgresPortFromDatabaseUrl(databaseUrl),
@@ -28,6 +29,34 @@ function run(command, args, options = {}) {
   if (result.status !== 0) {
     process.exit(result.status ?? 1)
   }
+}
+
+async function resolveTestDatabaseUrl() {
+  const exampleDatabaseUrl = defaultTestDatabaseUrl('54330')
+  if (process.env.TEST_DATABASE_URL && process.env.TEST_DATABASE_URL !== exampleDatabaseUrl) {
+    return process.env.TEST_DATABASE_URL
+  }
+
+  return defaultTestDatabaseUrl(String(await findOpenPort()))
+}
+
+function findOpenPort() {
+  return new Promise((resolvePort, reject) => {
+    const server = createServer()
+
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      server.close(() => {
+        if (address && typeof address === 'object') {
+          resolvePort(address.port)
+          return
+        }
+
+        reject(new Error('Could not allocate an open TCP port'))
+      })
+    })
+  })
 }
 
 async function waitForComposePostgres(service, database, env) {
@@ -60,6 +89,10 @@ const env = {
 }
 
 if (process.env.TEST_SKIP_DOCKER !== '1') {
+  run('docker', [...composeArgs, 'down', '--volumes', '--remove-orphans'], {
+    cwd: repositoryRoot,
+    env,
+  })
   run('docker', [...composeArgs, 'up', '-d', 'postgres_test'], {
     cwd: repositoryRoot,
     env,

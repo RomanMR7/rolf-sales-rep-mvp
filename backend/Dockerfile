@@ -16,9 +16,10 @@ COPY backend backend
 WORKDIR /app/backend
 
 RUN DATABASE_URL="postgresql://superuser:superpassword@localhost:5432/rolf_sales_rep_mvp?schema=public" bun run prisma:generate
+RUN chmod +x /app/backend/scripts/render-start.sh
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-CMD ["bun", "run", "--cwd", "backend", "start"]
+CMD ["sh", "backend/scripts/render-start.sh"]

@@ -34,5 +34,11 @@
     "seed": "bun run --cwd backend seed",
     "smoke:backend:docker": "bun run --cwd backend smoke:docker",
     "e2e:webapp": "bun run --cwd webapp e2e"
+  },
+  "devDependencies": {
+    "@babel/types": "7.29.7"
+  },
+  "resolutions": {
+    "@babel/types": "7.29.7"
   }
 }
