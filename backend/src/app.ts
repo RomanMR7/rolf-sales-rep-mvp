@@ -13,6 +13,7 @@ import type { AppHonoEnv } from './http/context'
 import { userDtoFromAuthenticatedUser } from './http/context'
 import { errorResponse, handleError, validationErrorHook } from './http/errors'
 import { createStorageServiceFromEnv } from './storage/service'
+import { telegramWebhookReplyForUpdate } from './telegram/bot'
 
 type CreateAppOptions = {
   env: AppEnv
@@ -68,6 +69,14 @@ export function createApp({ env, prisma }: CreateAppOptions) {
   })
   app.get('/telegram/config', (c) => telegramConfig(c.get('env')))
   app.get('/api/telegram/config', (c) => telegramConfig(c.get('env')))
+  app.post('/telegram/webhook', async (c) => {
+    const update = await c.req.json().catch(() => ({}))
+    return c.json(telegramWebhookReplyForUpdate(update, c.get('env')), 200)
+  })
+  app.post('/api/telegram/webhook', async (c) => {
+    const update = await c.req.json().catch(() => ({}))
+    return c.json(telegramWebhookReplyForUpdate(update, c.get('env')), 200)
+  })
   app.route('/api/admin', createAdminRoutes(prisma))
   app.route('/api/leads', createLeadRoutes(prisma))
   app.route('/leads', createLeadRoutes(prisma))
@@ -96,6 +105,7 @@ function telegramConfig(env: AppEnv) {
     startCommand: '/start',
     menuButtonUrl: webAppUrl,
     directLink: username ? `https://t.me/${username}?startapp` : null,
+    webhookUrl: env.BACKEND_PUBLIC_URL ? `${env.BACKEND_PUBLIC_URL.replace(/\/+$/, '')}/telegram/webhook` : null,
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

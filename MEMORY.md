@@ -669,3 +669,13 @@ CI follow-up:
 * Updated seed data to owner/supervisor/manager demo roles plus manager profiles, function settings, sales scripts, leads, and daily metrics.
 * Updated README, Telegram setup docs, and env examples with `BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `WEBAPP_URL`, `BACKEND_PUBLIC_URL`, and `ADMIN_TELEGRAM_IDS`.
 * Validation so far: `bun run --cwd backend typecheck`, `bun run --cwd webapp typecheck`, `bun run --cwd backend test`, and `bun run --cwd webapp test` passed after fixes.
+
+## Live Deploy E2E Follow-up - 2026-07-10
+
+* Public Vercel status for `90bcc52` was successful, and production backend endpoints `/`, `/health`, `/telegram/config`, and `/openapi.json` returned 200.
+* Live backend config showed `TELEGRAM_BOT_USERNAME=ALIRolfUae_bot` and `TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app`.
+* Production DB/admin smoke confirmed `admin@rolf-demo.local` is `OWNER ACTIVE`, `rep1@rolf-demo.local` is `MANAGER`, admin APIs work, manager receives 403 on `/api/admin/users`, metrics/leads/functions/scripts work, and audit log records admin actions.
+* Found Vercel browser fallback made an unnecessary `/api/auth/refresh` request outside Telegram, producing a console 401. Fixed in `webapp/src/lib/auth.tsx` by skipping bootstrap refresh outside Telegram and outside local dev.
+* Found Telegram `/start` could not work end-to-end because there was helper code but no webhook endpoint. Added `POST /telegram/webhook` and `/api/telegram/webhook`; `/start`, `/help`, and `/settings` return Telegram `sendMessage` payloads with a Web App button.
+* Added `backend/src/telegram/bot.test.ts` and documented Telegram `setWebhook` command in `docs/TELEGRAM_SETUP.md`.
+* Validation after fixes passed: `bun run typecheck`, `bun run --cwd webapp lint`, `bun run test`, `bun run --cwd webapp build`, and `bun run smoke:backend:docker`.

@@ -180,7 +180,22 @@ Local-only dev payload:
 
 ## Minimal Bot Behavior
 
-For staging, BotFather's Menu Button / Configure Mini App is enough to open the app. The backend now includes a minimal dependency-free bot helper in `backend/src/telegram/bot.ts` for `/start`, `/help`, and `/settings`. It builds an inline keyboard button with `web_app.url = TELEGRAM_WEBAPP_URL`; deploy it behind webhook or polling when the bot needs command replies beyond BotFather's menu button.
+For staging, BotFather's Menu Button / Configure Mini App is enough to open the app. The backend now includes a minimal dependency-free bot helper in `backend/src/telegram/bot.ts` and webhook route for `/start`, `/help`, and `/settings`. It builds an inline keyboard button with `web_app.url = TELEGRAM_WEBAPP_URL`.
+
+Production webhook endpoint:
+
+```text
+POST https://rolf-sales-rep-mvp-backend.onrender.com/telegram/webhook
+```
+
+Set it once through the Telegram Bot API after Render deploys the backend:
+
+```bash
+curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -d "url=https://rolf-sales-rep-mvp-backend.onrender.com/telegram/webhook"
+```
+
+After that, `/start`, `/help`, and `/settings` return a message with an `Open ROLF Sales App` Mini App button.
 
 Render env vars for that bot layer:
 

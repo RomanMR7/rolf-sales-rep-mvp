@@ -42,3 +42,13 @@ export function telegramBotResponseForUpdate(update: TelegramUpdate, env: Pick<A
       : undefined,
   }
 }
+
+export function telegramWebhookReplyForUpdate(update: TelegramUpdate, env: Pick<AppEnv, 'TELEGRAM_WEBAPP_URL'>) {
+  const response = telegramBotResponseForUpdate(update, env)
+  if (!response) return { ok: true }
+
+  return {
+    method: 'sendMessage',
+    ...response,
+  }
+}
