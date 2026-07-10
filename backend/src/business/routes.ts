@@ -353,7 +353,7 @@ export function createBusinessRoutes(db: DbClient) {
       db.order.count({ where: { ...own, createdAt: { gte, lt } } }),
       db.order.aggregate({ where: { ...own, createdAt: { gte, lt } }, _sum: { total: true } }),
       db.clientPoint.count({ where: clientOwn }),
-      isManagerRole(actor) ? db.user.count({ where: { role: 'SALES_REP' } }) : Promise.resolve(undefined),
+      isManagerRole(actor) ? db.user.count({ where: { role: 'MANAGER', status: 'ACTIVE' } }) : Promise.resolve(undefined),
       db.order.findMany({ where: own, include: orderInclude, orderBy: { createdAt: 'desc' }, take: 5 }),
     ])
     return c.json({
@@ -398,28 +398,28 @@ const orderInclude = {
   items: { include: { product: { include: { category: true } } } },
 } as const
 
-async function getClientForActor(db: DbClient, id: string, actor: { id: string; role: 'ADMIN' | 'MANAGER' | 'SALES_REP' }) {
+async function getClientForActor(db: DbClient, id: string, actor: { id: string; role: 'OWNER' | 'ADMIN' | 'SUPERVISOR' | 'MANAGER' | 'VIEWER' }) {
   const client = await db.clientPoint.findUnique({ where: { id } })
   if (!client) throw new AppError(404, 'NOT_FOUND', 'Client not found')
   assertOwns(actor, client.assignedRepId)
   return client
 }
 
-async function getVisitForActor(db: DbClient, id: string, actor: { id: string; role: 'ADMIN' | 'MANAGER' | 'SALES_REP' }) {
+async function getVisitForActor(db: DbClient, id: string, actor: { id: string; role: 'OWNER' | 'ADMIN' | 'SUPERVISOR' | 'MANAGER' | 'VIEWER' }) {
   const visit = await db.visit.findUnique({ where: { id }, include: { clientPoint: true } })
   if (!visit) throw new AppError(404, 'NOT_FOUND', 'Visit not found')
   assertOwns(actor, visit.salesRepId)
   return visit
 }
 
-async function getOrderForActor(db: DbClient, id: string, actor: { id: string; role: 'ADMIN' | 'MANAGER' | 'SALES_REP' }) {
+async function getOrderForActor(db: DbClient, id: string, actor: { id: string; role: 'OWNER' | 'ADMIN' | 'SUPERVISOR' | 'MANAGER' | 'VIEWER' }) {
   const order = await db.order.findUnique({ where: { id }, include: orderInclude })
   if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found')
   assertOwns(actor, order.salesRepId)
   return order
 }
 
-function listVisits(db: DbClient, actor: { id: string; role: 'ADMIN' | 'MANAGER' | 'SALES_REP' }, extraWhere = {}) {
+function listVisits(db: DbClient, actor: { id: string; role: 'OWNER' | 'ADMIN' | 'SUPERVISOR' | 'MANAGER' | 'VIEWER' }, extraWhere = {}) {
   return db.visit.findMany({
     where: { ...(isManagerRole(actor) ? {} : { salesRepId: actor.id }), ...extraWhere },
     include: { clientPoint: true },
@@ -427,7 +427,7 @@ function listVisits(db: DbClient, actor: { id: string; role: 'ADMIN' | 'MANAGER'
   })
 }
 
-function listOrders(db: DbClient, actor: { id: string; role: 'ADMIN' | 'MANAGER' | 'SALES_REP' }) {
+function listOrders(db: DbClient, actor: { id: string; role: 'OWNER' | 'ADMIN' | 'SUPERVISOR' | 'MANAGER' | 'VIEWER' }) {
   return db.order.findMany({
     where: isManagerRole(actor) ? {} : { salesRepId: actor.id },
     include: orderInclude,

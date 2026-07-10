@@ -654,3 +654,18 @@ CI follow-up:
 * Increased the heavy runtime typography render smoke timeout to 30 seconds to avoid cold-import flakiness after long typography-policy runs.
 * Final E2E passed locally with proxy disabled for localhost.
 * Final requested validation passed again, including `bun run smoke:backend:docker` and `bun run test`.
+
+## Production Telegram Mini App Admin Upgrade - 2026-07-10
+
+* User requested upgrading `rolf-sales-rep-mvp` into a production Telegram Mini App management system with Telegram auth, RBAC, admin manager management, editable function settings, sales scripts, leads/deals, metrics, and audit logs.
+* `memanto` CLI was unavailable in this environment; continued using `MEMORY.md` fallback per repository policy.
+* Added Prisma models/migration for `UserStatus`, manager profiles, deals, function settings, sales scripts, activity logs, and manager daily metrics.
+* Kept legacy database enum value `SALES_REP` for rollout safety so existing rows/migrations do not fail; API/public contract maps user-facing roles to `OWNER`, `ADMIN`, `SUPERVISOR`, `MANAGER`, and `VIEWER`.
+* Added backend RBAC helpers `requireRole` and `requirePermission`.
+* Added admin APIs under `/api/admin`, leads APIs under `/api/leads`, compatibility aliases `/auth/telegram` and `/me`, and launch metadata `GET /telegram/config`.
+* Added safe Telegram owner bootstrap through `ADMIN_TELEGRAM_IDS`; signed Telegram users in that list become active owners, unknown Telegram users become invited viewers.
+* Added a minimal dependency-free Telegram bot helper for `/start`, `/help`, and `/settings` Web App button payloads.
+* Updated webapp into a mobile-first Mini App shell with safe browser fallback, Telegram SDK loading, bottom navigation, admin-only managers/functions/scripts/metrics screens, leads screen, and settings screen.
+* Updated seed data to owner/supervisor/manager demo roles plus manager profiles, function settings, sales scripts, leads, and daily metrics.
+* Updated README, Telegram setup docs, and env examples with `BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `WEBAPP_URL`, `BACKEND_PUBLIC_URL`, and `ADMIN_TELEGRAM_IDS`.
+* Validation so far: `bun run --cwd backend typecheck`, `bun run --cwd webapp typecheck`, `bun run --cwd backend test`, and `bun run --cwd webapp test` passed after fixes.

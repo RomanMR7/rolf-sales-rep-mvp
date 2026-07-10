@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const userRoleSchema = z.enum(['ADMIN', 'MANAGER', 'SALES_REP'])
+export const userRoleSchema = z.enum(['OWNER', 'ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER'])
 export const clientPointTypeSchema = z.enum(['AUTO_SHOP', 'SERVICE_STATION', 'WHOLESALE', 'RETAIL', 'OTHER'])
 export const clientPointStatusSchema = z.enum(['ACTIVE', 'PAUSED', 'LEAD', 'ARCHIVED'])
 export const visitStatusSchema = z.enum(['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'])

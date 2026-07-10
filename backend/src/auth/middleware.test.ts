@@ -6,7 +6,7 @@ import { AppError, handleError } from '../http/errors'
 import type { AuthenticatedHonoEnv } from '../http/context'
 import type { StorageService } from '../storage/service'
 import type { AuthService } from './service'
-import { requireAuth } from './middleware'
+import { requireAuth, requirePermission, requireRole } from './middleware'
 
 const env: AppEnv = {
   PORT: 3000,
@@ -16,6 +16,7 @@ const env: AppEnv = {
   ACCESS_TOKEN_TTL_SECONDS: 60,
   REFRESH_TOKEN_TTL_DAYS: 30,
   COOKIE_SECURE: true,
+  ADMIN_TELEGRAM_IDS: [],
   ALLOW_DEV_AUTH: false,
   SPACES_UPLOAD_MAX_BYTES: 10 * 1024 * 1024,
   SPACES_UPLOAD_URL_TTL_SECONDS: 900,
@@ -54,9 +55,28 @@ describe('requireAuth middleware', () => {
       userId: 'user-1',
     })
   })
+
+  test('enforces required roles and permissions', async () => {
+    const app = createProtectedTestApp('VIEWER')
+
+    const roleDenied = await app.request('/owner-only', {
+      headers: { Authorization: 'Bearer valid-token' },
+    })
+    expect(roleDenied.status).toBe(403)
+
+    const permissionDenied = await app.request('/manage-users', {
+      headers: { Authorization: 'Bearer valid-token' },
+    })
+    expect(permissionDenied.status).toBe(403)
+
+    const metricsAllowed = await app.request('/metrics', {
+      headers: { Authorization: 'Bearer valid-token' },
+    })
+    expect(metricsAllowed.status).toBe(200)
+  })
 })
 
-function createProtectedTestApp() {
+function createProtectedTestApp(role = 'MANAGER') {
   const app = new Hono<AuthenticatedHonoEnv>()
   const authService = {
     async authenticateAccessToken(accessToken: string | undefined) {
@@ -68,6 +88,15 @@ function createProtectedTestApp() {
         id: 'user-1',
         email: 'user@example.com',
         displayName: null,
+        role,
+        status: 'ACTIVE',
+        telegramId: null,
+        telegramUsername: null,
+        telegramFirstName: null,
+        telegramLastName: null,
+        telegramPhotoUrl: null,
+        supervisorId: null,
+        lastSeenAt: null,
         createdAt: '2026-01-01T00:00:00.000Z',
         sessionId: 'session-1',
       }
@@ -90,6 +119,9 @@ function createProtectedTestApp() {
       userId: user.id,
     })
   })
+  app.get('/owner-only', requireRole(['OWNER']), (c) => c.json({ ok: true }))
+  app.get('/manage-users', requirePermission('users:manage'), (c) => c.json({ ok: true }))
+  app.get('/metrics', requirePermission('metrics:view'), (c) => c.json({ ok: true }))
   app.onError(handleError)
 
   return app

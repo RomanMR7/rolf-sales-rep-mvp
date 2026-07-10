@@ -19,11 +19,15 @@ export const userSchema = z.object({
   id: z.string(),
   email: emailSchema,
   displayName: z.string().nullable(),
-  role: z.enum(['ADMIN', 'MANAGER', 'SALES_REP']),
+  role: z.enum(['OWNER', 'ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER']),
+  status: z.enum(['ACTIVE', 'BLOCKED', 'INVITED', 'DISABLED']),
   telegramId: z.string().nullable(),
   telegramUsername: z.string().nullable(),
   telegramFirstName: z.string().nullable(),
   telegramLastName: z.string().nullable(),
+  telegramPhotoUrl: z.string().nullable(),
+  supervisorId: z.string().nullable(),
+  lastSeenAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
 })
 

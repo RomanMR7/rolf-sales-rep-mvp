@@ -103,7 +103,10 @@ JWT_SECRET=<random-32-plus-character-secret>
 CORS_ORIGINS=https://rolf-sales-rep-mvp-webapp.vercel.app
 COOKIE_SECURE=true
 TELEGRAM_BOT_TOKEN=<bot-token-from-BotFather>
+TELEGRAM_BOT_USERNAME=<botusername>
 TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
+BACKEND_PUBLIC_URL=https://rolf-sales-rep-mvp-backend.onrender.com
+ADMIN_TELEGRAM_IDS=<comma-separated-telegram-owner-ids>
 ALLOW_DEV_AUTH=false
 ```
 
@@ -121,11 +124,11 @@ Production safety:
 
 Demo users after the automatic seed:
 
-- Admin: `admin@rolf-demo.local`
-- Manager: `manager@rolf-demo.local`
-- Sales rep: `rep1@rolf-demo.local`
-- Sales rep: `rep2@rolf-demo.local`
-- Sales rep: `rep3@rolf-demo.local`
+- Owner: `admin@rolf-demo.local`
+- Supervisor: `manager@rolf-demo.local`
+- Manager: `rep1@rolf-demo.local`
+- Manager: `rep2@rolf-demo.local`
+- Manager: `rep3@rolf-demo.local`
 - Password for all demo users: `DemoPass123!`
 
 Demo-ready flow:
@@ -168,6 +171,33 @@ Business MVP endpoints:
 - `POST /api/orders/:id/approve`
 - `POST /api/orders/:id/reject`
 - `POST /api/orders/:id/cancel`
+
+Production management endpoints:
+
+- `POST /api/auth/telegram` and compatibility `POST /auth/telegram`
+- `GET /api/auth/me` and compatibility `GET /me`
+- `GET /telegram/config`
+- `GET|POST /api/admin/users`
+- `PATCH /api/admin/users/:id`
+- `PATCH /api/admin/users/:id/role`
+- `PATCH /api/admin/users/:id/status`
+- `DELETE /api/admin/users/:id` soft-disables non-owner users
+- `GET /api/admin/managers`
+- `GET /api/admin/managers/:id`
+- `PATCH /api/admin/managers/:id/profile`
+- `GET /api/admin/managers/:id/metrics`
+- `GET /api/admin/functions`
+- `PATCH /api/admin/functions/:key`
+- `GET|POST /api/admin/scripts`
+- `PATCH|DELETE /api/admin/scripts/:id`
+- `GET /api/admin/metrics/overview`
+- `GET /api/admin/metrics/managers`
+- `GET /api/admin/metrics/managers/:id`
+- `GET /api/admin/activity-log`
+- `GET|POST /api/leads`
+- `PATCH /api/leads/:id`
+- `PATCH /api/leads/:id/assign`
+- `PATCH /api/leads/:id/status`
 
 Demo catalog note: Демо-номенклатура, заменить на реальный прайс клиента.
 

@@ -8,11 +8,11 @@ const db = createPrisma(databaseUrl)
 const password = 'DemoPass123!'
 
 const users = [
-  { email: 'admin@rolf-demo.local', displayName: 'Dubai Admin', role: UserRole.ADMIN },
-  { email: 'manager@rolf-demo.local', displayName: 'Dubai Sales Manager', role: UserRole.MANAGER },
-  { email: 'rep1@rolf-demo.local', displayName: 'Omar Al Farsi', role: UserRole.SALES_REP, telegramId: '200001', telegramUsername: 'omar_rolf' },
-  { email: 'rep2@rolf-demo.local', displayName: 'Nina Petrova', role: UserRole.SALES_REP, telegramId: '200002', telegramUsername: 'nina_rolf' },
-  { email: 'rep3@rolf-demo.local', displayName: 'Karim Haddad', role: UserRole.SALES_REP, telegramId: '200003', telegramUsername: 'karim_rolf' },
+  { email: 'admin@rolf-demo.local', displayName: 'Dubai Owner', role: UserRole.OWNER },
+  { email: 'manager@rolf-demo.local', displayName: 'Dubai Sales Supervisor', role: UserRole.SUPERVISOR },
+  { email: 'rep1@rolf-demo.local', displayName: 'Omar Al Farsi', role: UserRole.MANAGER, telegramId: '200001', telegramUsername: 'omar_rolf' },
+  { email: 'rep2@rolf-demo.local', displayName: 'Nina Petrova', role: UserRole.MANAGER, telegramId: '200002', telegramUsername: 'nina_rolf' },
+  { email: 'rep3@rolf-demo.local', displayName: 'Karim Haddad', role: UserRole.MANAGER, telegramId: '200003', telegramUsername: 'karim_rolf' },
 ]
 
 const categories = [
@@ -86,14 +86,31 @@ async function main() {
           select: { id: true },
         })
       : null
-    const saved = existingByEmail ?? existingByTelegramId ?? await db.user.create({
-      data: { ...user, passwordHash },
-      select: { id: true },
-    })
+    const existing = existingByEmail ?? existingByTelegramId
+    const saved = existing
+      ? await db.user.update({
+          where: { id: existing.id },
+          data: { ...user, status: 'ACTIVE', passwordHash },
+          select: { id: true },
+        })
+      : await db.user.create({
+          data: { ...user, status: 'ACTIVE', passwordHash },
+          select: { id: true },
+        })
     savedUsers.set(user.email, saved)
   }
 
-  const reps = users.filter((user) => user.role === UserRole.SALES_REP).map((user) => savedUsers.get(user.email)!)
+  const supervisor = savedUsers.get('manager@rolf-demo.local')!
+  const reps = users.filter((user) => user.role === UserRole.MANAGER).map((user) => savedUsers.get(user.email)!)
+  for (const user of users.filter((candidate) => candidate.role === UserRole.MANAGER)) {
+    const saved = savedUsers.get(user.email)!
+    await db.user.update({ where: { id: saved.id }, data: { supervisorId: supervisor.id } })
+    await db.managerProfile.upsert({
+      where: { userId: saved.id },
+      update: { displayName: user.displayName, timezone: 'Asia/Dubai', workingStatus: 'available', dailyLimit: 25, monthlyLimit: 520 },
+      create: { userId: saved.id, displayName: user.displayName, timezone: 'Asia/Dubai', workingStatus: 'available', dailyLimit: 25, monthlyLimit: 520 },
+    })
+  }
 
   const savedCategories = new Map<string, { id: string }>()
   for (const [slug, name, description] of categories) {
@@ -225,7 +242,83 @@ async function main() {
     })
   }
 
+  await seedAdminManagementData(reps)
+
   console.log('Seed data is ready.')
+}
+
+async function seedAdminManagementData(reps: Array<{ id: string }>) {
+  const today = startOfDay(new Date())
+  for (const [index, rep] of reps.entries()) {
+    await db.managerDailyMetric.upsert({
+      where: { managerId_date: { managerId: rep.id, date: today } },
+      update: {
+        leadsNew: 8 + index,
+        leadsTaken: 6 + index,
+        dealsSuccess: 3 + index,
+        dealsCancelled: index,
+        totalAmount: 4200 + index * 1700,
+        avgResponseSeconds: 90 + index * 35,
+        messagesCount: 70 + index * 18,
+        conversionRate: 32 + index * 6,
+      },
+      create: {
+        managerId: rep.id,
+        date: today,
+        leadsNew: 8 + index,
+        leadsTaken: 6 + index,
+        dealsSuccess: 3 + index,
+        dealsCancelled: index,
+        totalAmount: 4200 + index * 1700,
+        avgResponseSeconds: 90 + index * 35,
+        messagesCount: 70 + index * 18,
+        conversionRate: 32 + index * 6,
+      },
+    })
+  }
+
+  const functionSeeds = [
+    ['lead_auto_assign', 'Lead auto assignment', 'Distribute new Telegram leads between active managers.', { mode: 'round_robin' }],
+    ['daily_limits', 'Manager daily limits', 'Caps the amount of new leads a manager can receive per day.', { defaultLimit: 25 }],
+    ['admin_notifications', 'Admin notifications', 'Notify owners when manager status or scripts change.', { enabled: true }],
+  ] as const
+  for (const [key, title, description, valueJson] of functionSeeds) {
+    await db.functionSetting.upsert({
+      where: { key },
+      update: { title, description, valueJson, enabled: true },
+      create: { key, title, description, valueJson, enabled: true },
+    })
+  }
+
+  const scriptSeeds = [
+    ['First contact', 'Hello! I am checking your current motor oil stock and delivery schedule.', 'opening'],
+    ['Follow-up', 'I can reserve today pricing and confirm delivery options for this week.', 'follow_up'],
+  ] as const
+  for (const [index, [title, body, category]] of scriptSeeds.entries()) {
+    await db.salesScript.upsert({
+      where: { id: await stableId('sales-script', index) },
+      update: { title, body, category, enabled: true },
+      create: { id: await stableId('sales-script', index), title, body, category, enabled: true },
+    })
+  }
+
+  for (const [index, rep] of reps.entries()) {
+    await db.deal.upsert({
+      where: { id: await stableId('deal', index) },
+      update: {},
+      create: {
+        id: await stableId('deal', index),
+        title: `Fleet lead ${index + 1}`,
+        clientName: ['Palm Fleet Service', 'Emirates Workshop Group', 'Desert Logistics'][index] ?? `Client ${index + 1}`,
+        source: 'telegram',
+        status: index === 0 ? 'SUCCESS' : index === 1 ? 'IN_PROGRESS' : 'NEW',
+        amount: 2500 + index * 1800,
+        assignedManagerId: rep.id,
+        createdBy: rep.id,
+        closedAt: index === 0 ? new Date() : null,
+      },
+    })
+  }
 }
 
 function startOfDay(date: Date) {

@@ -12,6 +12,7 @@ export type TelegramUserProfile = {
   username?: string
   firstName?: string
   lastName?: string
+  photoUrl?: string
 }
 
 export function verifyTelegramInitData(
@@ -108,6 +109,7 @@ function telegramUserFromJson(rawUser: string | null): TelegramUserProfile {
     username: parsed.username,
     firstName: parsed.first_name,
     lastName: parsed.last_name,
+    photoUrl: parsed.photo_url,
   }
 }
 
@@ -116,6 +118,7 @@ function isTelegramUserPayload(value: unknown): value is {
   username?: string
   first_name?: string
   last_name?: string
+  photo_url?: string
 } {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>

@@ -37,7 +37,7 @@ import {
   type TelegramAuthRequest,
   type VisitInput,
 } from '@rolf-sales-rep-mvp/contracts'
-import type { z } from 'zod'
+import { z } from 'zod'
 
 import {
   logApiBaseSelection,
@@ -233,6 +233,106 @@ export class ApiClient {
     return this.request(`/api/orders/${id}/${action}`, orderResponseSchema, {
       method: 'POST',
       body,
+      auth: true,
+    })
+  }
+
+  adminUsers() {
+    return this.request('/api/admin/users', z.object({ users: z.array(z.any()) }), { auth: true })
+  }
+
+  createAdminUser(input: unknown) {
+    return this.request('/api/admin/users', z.object({ user: z.any() }), {
+      method: 'POST',
+      body: input,
+      auth: true,
+    })
+  }
+
+  updateAdminUser(id: string, input: unknown) {
+    return this.request(`/api/admin/users/${id}`, z.object({ user: z.any() }), {
+      method: 'PATCH',
+      body: input,
+      auth: true,
+    })
+  }
+
+  updateAdminUserRole(id: string, role: string) {
+    return this.request(`/api/admin/users/${id}/role`, z.object({ user: z.any() }), {
+      method: 'PATCH',
+      body: { role },
+      auth: true,
+    })
+  }
+
+  updateAdminUserStatus(id: string, status: string) {
+    return this.request(`/api/admin/users/${id}/status`, z.object({ user: z.any() }), {
+      method: 'PATCH',
+      body: { status },
+      auth: true,
+    })
+  }
+
+  adminManagers() {
+    return this.request('/api/admin/managers', z.object({ managers: z.array(z.any()) }), { auth: true })
+  }
+
+  adminManagerMetrics(id: string, params = '') {
+    return this.request(`/api/admin/managers/${id}/metrics${params}`, z.object({ metrics: z.array(z.any()) }), { auth: true })
+  }
+
+  adminFunctions() {
+    return this.request('/api/admin/functions', z.object({ functions: z.array(z.any()) }), { auth: true })
+  }
+
+  updateAdminFunction(key: string, input: unknown) {
+    return this.request(`/api/admin/functions/${key}`, z.object({ function: z.any() }), {
+      method: 'PATCH',
+      body: input,
+      auth: true,
+    })
+  }
+
+  adminScripts() {
+    return this.request('/api/admin/scripts', z.object({ scripts: z.array(z.any()) }), { auth: true })
+  }
+
+  createAdminScript(input: unknown) {
+    return this.request('/api/admin/scripts', z.object({ script: z.any() }), {
+      method: 'POST',
+      body: input,
+      auth: true,
+    })
+  }
+
+  updateAdminScript(id: string, input: unknown) {
+    return this.request(`/api/admin/scripts/${id}`, z.object({ script: z.any() }), {
+      method: 'PATCH',
+      body: input,
+      auth: true,
+    })
+  }
+
+  adminMetricsOverview(params = '') {
+    return this.request(`/api/admin/metrics/overview${params}`, z.object({ metrics: z.any() }), { auth: true })
+  }
+
+  adminMetricsManagers(params = '') {
+    return this.request(`/api/admin/metrics/managers${params}`, z.object({ managers: z.array(z.any()) }), { auth: true })
+  }
+
+  adminActivityLog() {
+    return this.request('/api/admin/activity-log', z.object({ logs: z.array(z.any()) }), { auth: true })
+  }
+
+  leads() {
+    return this.request('/api/leads', z.object({ leads: z.array(z.any()) }), { auth: true })
+  }
+
+  createLead(input: unknown) {
+    return this.request('/api/leads', z.object({ lead: z.any() }), {
+      method: 'POST',
+      body: input,
       auth: true,
     })
   }

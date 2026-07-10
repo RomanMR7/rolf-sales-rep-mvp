@@ -12,18 +12,35 @@ model User {
   email             String        @unique
   passwordHash      String        @map("password_hash")
   displayName       String?       @map("display_name")
-  role              UserRole      @default(SALES_REP)
+  role              UserRole      @default(VIEWER)
+  status            UserStatus    @default(INVITED)
   telegramId        String?       @unique @map("telegram_id")
   telegramUsername  String?       @map("telegram_username")
   telegramFirstName String?       @map("telegram_first_name")
   telegramLastName  String?       @map("telegram_last_name")
+  telegramPhotoUrl  String?       @map("telegram_photo_url")
+  supervisorId      String?       @db.Uuid @map("supervisor_id")
+  lastSeenAt        DateTime?     @map("last_seen_at")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
   sessions          AuthSession[]
   assignedClients   ClientPoint[] @relation("AssignedRepClients")
   visits            Visit[]       @relation("SalesRepVisits")
   orders            Order[]       @relation("SalesRepOrders")
+  supervisor        User?         @relation("SupervisorManagers", fields: [supervisorId], references: [id], map: "users_supervisor_id_fkey")
+  assignedManagers  User[]        @relation("SupervisorManagers")
+  managerProfile    ManagerProfile?
+  assignedDeals     Deal[]        @relation("AssignedManagerDeals")
+  createdDeals      Deal[]        @relation("CreatedDeals")
+  functionUpdates   FunctionSetting[] @relation("FunctionSettingUpdater")
+  scriptUpdates     SalesScript[] @relation("SalesScriptUpdater")
+  activityActors    ActivityLog[] @relation("ActivityActor")
+  activityTargets   ActivityLog[] @relation("ActivityTarget")
+  dailyMetrics      ManagerDailyMetric[]
 
+  @@index([role], map: "users_role_idx")
+  @@index([status], map: "users_status_idx")
+  @@index([supervisorId], map: "users_supervisor_id_idx")
   @@map("users")
 }
 
@@ -45,9 +62,128 @@ model AuthSession {
 }
 
 enum UserRole {
+  OWNER
   ADMIN
+  SUPERVISOR
   MANAGER
+  VIEWER
   SALES_REP
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  INVITED
+  DISABLED
+}
+
+model ManagerProfile {
+  userId        String   @id @db.Uuid @map("user_id")
+  displayName   String?  @map("display_name")
+  phone         String?
+  timezone      String   @default("Asia/Dubai")
+  workingStatus String   @default("available") @map("working_status")
+  notes         String?
+  dailyLimit    Int?     @map("daily_limit")
+  monthlyLimit  Int?     @map("monthly_limit")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "manager_profiles_user_id_fkey")
+
+  @@map("manager_profiles")
+}
+
+model Deal {
+  id                String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  title             String
+  clientName        String     @map("client_name")
+  source            String?
+  status            DealStatus @default(NEW)
+  amount            Decimal    @default(0) @db.Decimal(12, 2)
+  assignedManagerId String?    @db.Uuid @map("assigned_manager_id")
+  createdBy         String?    @db.Uuid @map("created_by")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  closedAt          DateTime?  @map("closed_at")
+  assignedManager   User?      @relation("AssignedManagerDeals", fields: [assignedManagerId], references: [id], map: "deals_assigned_manager_id_fkey")
+  creator           User?      @relation("CreatedDeals", fields: [createdBy], references: [id], map: "deals_created_by_fkey")
+
+  @@index([assignedManagerId], map: "deals_assigned_manager_id_idx")
+  @@index([status], map: "deals_status_idx")
+  @@index([createdAt], map: "deals_created_at_idx")
+  @@map("deals")
+}
+
+enum DealStatus {
+  NEW
+  TAKEN
+  IN_PROGRESS
+  SUCCESS
+  CANCELLED
+}
+
+model FunctionSetting {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  key         String   @unique
+  title       String
+  description String?
+  valueJson   Json     @default("{}") @map("value_json")
+  enabled     Boolean  @default(true)
+  updatedBy   String?  @db.Uuid @map("updated_by")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updater     User?    @relation("FunctionSettingUpdater", fields: [updatedBy], references: [id], map: "function_settings_updated_by_fkey")
+
+  @@map("function_settings")
+}
+
+model SalesScript {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  title     String
+  body      String
+  category  String?
+  enabled   Boolean  @default(true)
+  updatedBy String?  @db.Uuid @map("updated_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updater   User?    @relation("SalesScriptUpdater", fields: [updatedBy], references: [id], map: "sales_scripts_updated_by_fkey")
+
+  @@index([enabled], map: "sales_scripts_enabled_idx")
+  @@map("sales_scripts")
+}
+
+model ActivityLog {
+  id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  actorUserId  String   @db.Uuid @map("actor_user_id")
+  targetUserId String?  @db.Uuid @map("target_user_id")
+  entityType   String   @map("entity_type")
+  entityId     String   @map("entity_id")
+  action       String
+  payloadJson  Json     @default("{}") @map("payload_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+  actor        User     @relation("ActivityActor", fields: [actorUserId], references: [id], map: "activity_logs_actor_user_id_fkey")
+  target       User?    @relation("ActivityTarget", fields: [targetUserId], references: [id], map: "activity_logs_target_user_id_fkey")
+
+  @@index([actorUserId], map: "activity_logs_actor_user_id_idx")
+  @@index([targetUserId], map: "activity_logs_target_user_id_idx")
+  @@index([entityType, entityId], map: "activity_logs_entity_idx")
+  @@index([createdAt], map: "activity_logs_created_at_idx")
+  @@map("activity_logs")
+}
+
+model ManagerDailyMetric {
+  id                 String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  managerId          String   @db.Uuid @map("manager_id")
+  date               DateTime @db.Date
+  leadsNew           Int      @default(0) @map("leads_new")
+  leadsTaken         Int      @default(0) @map("leads_taken")
+  dealsSuccess       Int      @default(0) @map("deals_success")
+  dealsCancelled     Int      @default(0) @map("deals_cancelled")
+  totalAmount        Decimal  @default(0) @db.Decimal(12, 2) @map("total_amount")
+  avgResponseSeconds Int      @default(0) @map("avg_response_seconds")
+  messagesCount      Int      @default(0) @map("messages_count")
+  conversionRate     Decimal  @default(0) @db.Decimal(5, 2) @map("conversion_rate")
+  manager            User     @relation(fields: [managerId], references: [id], onDelete: Cascade, map: "manager_daily_metrics_manager_id_fkey")
+
+  @@unique([managerId, date], map: "manager_daily_metrics_manager_id_date_key")
+  @@index([date], map: "manager_daily_metrics_date_idx")
+  @@map("manager_daily_metrics")
 }
 
 model ClientPoint {

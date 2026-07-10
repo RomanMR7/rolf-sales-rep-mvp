@@ -26,10 +26,14 @@ type UserRecord = {
   email: string
   displayName: string | null
   role: UserRole
+  status: 'ACTIVE' | 'BLOCKED' | 'INVITED' | 'DISABLED'
   telegramId: string | null
   telegramUsername: string | null
   telegramFirstName: string | null
   telegramLastName: string | null
+  telegramPhotoUrl: string | null
+  supervisorId: string | null
+  lastSeenAt: Date | null
   createdAt: Date
 }
 
@@ -93,6 +97,8 @@ export class AuthService {
       telegramUsername: profile.username,
       telegramFirstName: profile.firstName,
       telegramLastName: profile.lastName,
+      telegramPhotoUrl: profile.photoUrl,
+      lastSeenAt: new Date(),
       ...(displayName ? { displayName } : {}),
     }
 
@@ -101,6 +107,9 @@ export class AuthService {
     })
 
     if (existingUser) {
+      if (existingUser.status === 'BLOCKED' || existingUser.status === 'DISABLED') {
+        throw new AppError(403, 'FORBIDDEN', 'This Telegram user is not allowed to access the app')
+      }
       const user = await this.db.user.update({
         where: { id: existingUser.id },
         data: telegramData,
@@ -115,11 +124,14 @@ export class AuthService {
           email: telegramEmail(profile.telegramId),
           passwordHash,
           displayName,
-          role: UserRole.SALES_REP,
+          role: this.env.ADMIN_TELEGRAM_IDS.includes(profile.telegramId) ? UserRole.OWNER : UserRole.VIEWER,
+          status: this.env.ADMIN_TELEGRAM_IDS.includes(profile.telegramId) ? 'ACTIVE' : 'INVITED',
           telegramId: profile.telegramId,
           telegramUsername: profile.username,
           telegramFirstName: profile.firstName,
           telegramLastName: profile.lastName,
+          telegramPhotoUrl: profile.photoUrl,
+          lastSeenAt: new Date(),
         },
       })
       .catch((error: unknown) => {
@@ -297,11 +309,15 @@ export function toUserDto(user: UserRecord): UserDto {
     id: user.id,
     email: user.email,
     displayName: user.displayName,
-    role: user.role,
+    role: publicRole(user.role),
     telegramId: user.telegramId,
     telegramUsername: user.telegramUsername,
     telegramFirstName: user.telegramFirstName,
     telegramLastName: user.telegramLastName,
+    telegramPhotoUrl: user.telegramPhotoUrl,
+    status: user.status,
+    supervisorId: user.supervisorId,
+    lastSeenAt: user.lastSeenAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
   }
 }
@@ -312,4 +328,8 @@ function displayNameFromTelegramProfile(profile: TelegramUserProfile) {
 
 function telegramEmail(telegramId: string) {
   return `telegram-${telegramId}@telegram.rolf-sales-rep-mvp.local`
+}
+
+function publicRole(role: UserRole) {
+  return role === UserRole.SALES_REP ? UserRole.MANAGER : role
 }

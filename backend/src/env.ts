@@ -54,7 +54,13 @@ const envSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   COOKIE_SECURE: booleanStringSchema,
   TELEGRAM_BOT_TOKEN: optionalStringSchema,
+  TELEGRAM_BOT_USERNAME: optionalStringSchema,
   TELEGRAM_WEBAPP_URL: optionalUrlSchema,
+  BACKEND_PUBLIC_URL: optionalUrlSchema,
+  ADMIN_TELEGRAM_IDS: z
+    .string()
+    .default('')
+    .transform((value) => value.split(',').map((id) => id.trim()).filter(Boolean)),
   ALLOW_DEV_AUTH: booleanStringSchema,
   SPACES_REGION: optionalStringSchema,
   SPACES_BUCKET: optionalStringSchema,
@@ -75,7 +81,11 @@ const envSchema = z.object({
 export type AppEnv = z.infer<typeof envSchema>
 
 export function loadEnv(source: Record<string, string | undefined>) {
-  return envSchema.parse(source)
+  return envSchema.parse({
+    ...source,
+    TELEGRAM_BOT_TOKEN: source.TELEGRAM_BOT_TOKEN ?? source.BOT_TOKEN,
+    TELEGRAM_WEBAPP_URL: source.TELEGRAM_WEBAPP_URL ?? source.WEBAPP_URL,
+  })
 }
 
 function validateJwtSecret(env: z.infer<typeof envSchema>, ctx: z.RefinementCtx) {

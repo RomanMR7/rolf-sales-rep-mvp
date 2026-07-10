@@ -17,7 +17,8 @@ maybeDescribe('auth API integration', () => {
     ACCESS_TOKEN_TTL_SECONDS: 60,
     REFRESH_TOKEN_TTL_DAYS: 30,
     COOKIE_SECURE: false,
-  ALLOW_DEV_AUTH: false,
+    ADMIN_TELEGRAM_IDS: [],
+    ALLOW_DEV_AUTH: false,
     SPACES_UPLOAD_MAX_BYTES: 10 * 1024 * 1024,
     SPACES_UPLOAD_URL_TTL_SECONDS: 900,
     SPACES_DOWNLOAD_URL_TTL_SECONDS: 300,
@@ -199,7 +200,7 @@ maybeDescribe('auth API integration', () => {
         ...env,
         CORS_ORIGINS: ['https://web.example.com'],
         COOKIE_SECURE: true,
-  ALLOW_DEV_AUTH: false,
+        ALLOW_DEV_AUTH: false,
       },
       prisma,
     })
@@ -234,7 +235,7 @@ maybeDescribe('auth API integration', () => {
         ...env,
         CORS_ORIGINS: ['https://web.example.com'],
         COOKIE_SECURE: true,
-  ALLOW_DEV_AUTH: false,
+        ALLOW_DEV_AUTH: false,
       },
       prisma,
     })

@@ -1,6 +1,6 @@
 import { AppError } from '../http/errors'
 
-export type Role = 'ADMIN' | 'MANAGER' | 'SALES_REP'
+export type Role = 'OWNER' | 'ADMIN' | 'SUPERVISOR' | 'MANAGER' | 'VIEWER'
 
 export type Actor = {
   id: string
@@ -19,12 +19,12 @@ export type OrderStatus =
 export type VisitStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
 
 export function isManagerRole(actor: Actor) {
-  return actor.role === 'ADMIN' || actor.role === 'MANAGER'
+  return actor.role === 'OWNER' || actor.role === 'ADMIN' || actor.role === 'SUPERVISOR'
 }
 
 export function assertManager(actor: Actor) {
   if (!isManagerRole(actor)) {
-    throw new AppError(403, 'FORBIDDEN', 'Manager or admin role is required')
+    throw new AppError(403, 'FORBIDDEN', 'Supervisor, admin, or owner role is required')
   }
 }
 

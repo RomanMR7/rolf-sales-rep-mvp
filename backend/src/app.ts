@@ -4,10 +4,13 @@ import { secureHeaders } from 'hono/secure-headers'
 
 import type { DbClient } from './db'
 import type { AppEnv } from './env'
+import { createAdminRoutes, createLeadRoutes } from './admin/routes'
 import { createAuthRoutes } from './auth/routes'
+import { requireAuth } from './auth/middleware'
 import { AuthService } from './auth/service'
 import { createBusinessRoutes } from './business/routes'
 import type { AppHonoEnv } from './http/context'
+import { userDtoFromAuthenticatedUser } from './http/context'
 import { errorResponse, handleError, validationErrorHook } from './http/errors'
 import { createStorageServiceFromEnv } from './storage/service'
 
@@ -57,7 +60,17 @@ export function createApp({ env, prisma }: CreateAppOptions) {
     })
   })
 
-  app.route('/api/auth', createAuthRoutes())
+  const authRoutes = createAuthRoutes()
+  app.route('/api/auth', authRoutes)
+  app.route('/auth', authRoutes)
+  app.get('/me', requireAuth, (c) => {
+    return c.json({ user: userDtoFromAuthenticatedUser(c.var.user) }, 200)
+  })
+  app.get('/telegram/config', (c) => telegramConfig(c.get('env')))
+  app.get('/api/telegram/config', (c) => telegramConfig(c.get('env')))
+  app.route('/api/admin', createAdminRoutes(prisma))
+  app.route('/api/leads', createLeadRoutes(prisma))
+  app.route('/leads', createLeadRoutes(prisma))
   app.route('/api', createBusinessRoutes(prisma))
 
   app.doc('/openapi.json', {
@@ -72,6 +85,21 @@ export function createApp({ env, prisma }: CreateAppOptions) {
   app.onError(handleError)
 
   return app
+}
+
+function telegramConfig(env: AppEnv) {
+  const username = env.TELEGRAM_BOT_USERNAME ?? null
+  const webAppUrl = env.TELEGRAM_WEBAPP_URL ?? null
+  return new Response(JSON.stringify({
+    botUsername: username,
+    webAppUrl,
+    startCommand: '/start',
+    menuButtonUrl: webAppUrl,
+    directLink: username ? `https://t.me/${username}?startapp` : null,
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 export type AppType = ReturnType<typeof createApp>

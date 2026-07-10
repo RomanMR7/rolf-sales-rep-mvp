@@ -16,7 +16,7 @@ const navLinkClass = cn(
   'text-muted-foreground data-[status=active]:bg-secondary data-[status=active]:text-secondary-foreground data-[status=active]:hover:bg-secondary/80'
 )
 
-type View = 'today' | 'clients' | 'catalog' | 'orders' | 'visits' | 'admin'
+type View = 'today' | 'leads' | 'managers' | 'metrics' | 'settings' | 'functions' | 'scripts' | 'clients' | 'catalog' | 'orders' | 'visits' | 'admin'
 
 export function RootLayout() {
   return (
@@ -24,12 +24,12 @@ export function RootLayout() {
       <header className="sticky top-0 z-20 border-b border-border/70 bg-background/92 backdrop-blur">
         <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link to="/" className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+            <Typography as="span" variant="avatar" tone="inverse" className="grid size-10 place-items-center rounded-md bg-primary">
               RS
-            </span>
-            <span className="leading-tight">
+            </Typography>
+            <span className="grid gap-0.5">
               <Typography as="span" variant="h6">ROLF Sales App</Typography>
-              <span className="block text-xs font-medium uppercase text-muted-foreground">Dubai MVP</span>
+              <Typography as="span" variant="bodyXs" tone="muted" className="block uppercase">Dubai MVP</Typography>
             </span>
           </Link>
           <nav className="ml-auto flex items-center gap-1" aria-label="Primary">
@@ -57,29 +57,29 @@ export function AppPage() {
 
 function Workspace() {
   const auth = useAuth()
-  const [view, setView] = useState<View>('today')
+  const [view, setView] = useState<View>(() => viewFromPath(window.location.pathname))
   const [selectedClientId, setSelectedClientId] = useState<string>('')
 
   if (auth.isBootstrapping) return <LoadingState />
   if (!auth.user) return <TelegramAuthScreen />
 
-  const canManage = auth.user.role === 'ADMIN' || auth.user.role === 'MANAGER'
+  const canAdmin = auth.user.role === 'OWNER' || auth.user.role === 'ADMIN'
+  const canManageTeam = canAdmin || auth.user.role === 'SUPERVISOR'
+  const canManage = canAdmin || auth.user.role === 'SUPERVISOR'
   const views: Array<[View, string]> = [
-    ['today', 'Сегодня'],
-    ['clients', 'Клиенты'],
-    ['catalog', 'Каталог'],
-    ['orders', 'Заказы'],
-    ['visits', 'Визиты'],
-    ...(canManage ? [['admin', 'Админка'] as [View, string]] : []),
+    ['today', 'Dashboard'],
+    ['leads', 'Leads'],
+    ...(canManageTeam ? [['managers', 'Managers'] as [View, string], ['metrics', 'Metrics'] as [View, string]] : []),
+    ['settings', 'Settings'],
   ]
 
   return (
-    <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-6 sm:px-6">
+    <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 pb-24 pt-5 sm:px-6">
       <div className="flex flex-wrap items-center gap-3">
         <Badge variant="outline" className="border-amber-400/60 bg-amber-50 text-amber-900">
           {auth.user.role}
         </Badge>
-        <Typography variant="h1" className="text-3xl">
+        <Typography variant="h2">
           {auth.user.displayName ?? auth.user.email}
         </Typography>
         <Typography variant="bodySm" tone="muted">
@@ -89,19 +89,40 @@ function Workspace() {
           Logout
         </Button>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-3 py-2 backdrop-blur sm:hidden">
+        <nav className="mx-auto grid max-w-md grid-cols-5 gap-1" aria-label="Mini App">
+          {views.slice(0, 5).map(([key, label]) => (
+            <Button key={key} size="sm" variant={view === key ? 'default' : 'ghost'} className="h-11 px-1" onClick={() => setView(key)}>
+              <Typography as="span" variant="controlXs">{label}</Typography>
+            </Button>
+          ))}
+        </nav>
+      </div>
+      <div className="hidden gap-2 overflow-x-auto pb-1 sm:flex">
         {views.map(([key, label]) => (
           <Button key={key} variant={view === key ? 'default' : 'outline'} onClick={() => setView(key)}>
             {label}
           </Button>
         ))}
+        {canAdmin && (
+          <>
+            <Button variant={view === 'functions' ? 'default' : 'outline'} onClick={() => setView('functions')}>Functions</Button>
+            <Button variant={view === 'scripts' ? 'default' : 'outline'} onClick={() => setView('scripts')}>Scripts</Button>
+          </>
+        )}
       </div>
       {view === 'today' && <Dashboard />}
+      {view === 'leads' && <Leads canManage={auth.user.role !== 'VIEWER'} />}
+      {view === 'managers' && canManageTeam && <Managers />}
+      {view === 'metrics' && canManageTeam && <Metrics />}
+      {view === 'settings' && <Settings />}
+      {view === 'functions' && canAdmin && <Functions />}
+      {view === 'scripts' && canAdmin && <Scripts />}
       {view === 'clients' && <Clients onCreateOrder={(clientId) => { setSelectedClientId(clientId); setView('orders') }} />}
       {view === 'catalog' && <Catalog canManage={canManage} />}
       {view === 'orders' && <Orders canManage={canManage} selectedClientId={selectedClientId} onSelectedClientIdChange={setSelectedClientId} />}
       {view === 'visits' && <Visits />}
-      {view === 'admin' && <Admin />}
+      {view === 'admin' && canAdmin && <Admin />}
     </section>
   )
 }
@@ -328,10 +349,10 @@ function Orders({
             <input className="h-10 rounded-md border bg-background px-3" placeholder="Комментарий" value={comment} onChange={(event) => setComment(event.target.value)} />
             <input className="h-10 rounded-md border bg-background px-3" type="number" min="0" placeholder="Скидка заказа" value={orderDiscount} onChange={(event) => setOrderDiscount(Number(event.target.value))} />
           </div>
-          <div className="flex flex-wrap gap-3 text-sm">
-            <span>Subtotal: AED {totals.subtotal}</span>
-            <span>Discount: AED {totals.discount}</span>
-            <strong>Total: AED {totals.total}</strong>
+          <div className="flex flex-wrap gap-3">
+            <Typography as="span" variant="bodySm">Subtotal: AED {totals.subtotal}</Typography>
+            <Typography as="span" variant="bodySm">Discount: AED {totals.discount}</Typography>
+            <Typography as="strong" variant="emphasis">Total: AED {totals.total}</Typography>
           </div>
           {createOrder.error && <ErrorText error={createOrder.error} />}
           <Button className="w-fit" onClick={() => createOrder.mutate()} disabled={createOrder.isPending}>
@@ -403,6 +424,247 @@ function Visits() {
   )
 }
 
+function Leads({ canManage }: { canManage: boolean }) {
+  const auth = useAuth()
+  const queryClient = useQueryClient()
+  const leads = useQuery({ queryKey: ['leads'], queryFn: () => auth.api.leads() })
+  const [title, setTitle] = useState('')
+  const [clientName, setClientName] = useState('')
+  const createLead = useMutation({
+    mutationFn: () => auth.api.createLead({ title, clientName, source: 'telegram', amount: 0 }),
+    onSuccess: async () => {
+      setTitle('')
+      setClientName('')
+      await queryClient.invalidateQueries({ queryKey: ['leads'] })
+    },
+  })
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Leads</CardTitle>
+        <CardDescription>Role-scoped deal pipeline from Telegram and sales activity.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {canManage && (
+          <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_1fr_auto]">
+            <input className="h-10 rounded-md border bg-background px-3" placeholder="Lead title" value={title} onChange={(event) => setTitle(event.target.value)} />
+            <input className="h-10 rounded-md border bg-background px-3" placeholder="Client name" value={clientName} onChange={(event) => setClientName(event.target.value)} />
+            <Button disabled={!title || !clientName || createLead.isPending} onClick={() => createLead.mutate()}>Add</Button>
+          </div>
+        )}
+        {createLead.error && <ErrorText error={createLead.error} />}
+        <div className="grid gap-3">
+          {leads.isLoading && <LoadingCard title="leads" />}
+          {leads.data?.leads.length === 0 && <EmptyState title="No leads yet" />}
+          {leads.data?.leads.map((lead) => (
+            <Row key={lead.id} title={`${lead.title} · ${lead.status}`} detail={`${lead.clientName} · ${lead.assignedManager?.displayName ?? 'Unassigned'} · AED ${lead.amount}`} />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Managers() {
+  const auth = useAuth()
+  const queryClient = useQueryClient()
+  const managers = useQuery({ queryKey: ['admin', 'managers'], queryFn: () => auth.api.adminManagers() })
+  const [displayName, setDisplayName] = useState('')
+  const [telegramId, setTelegramId] = useState('')
+  const createManager = useMutation({
+    mutationFn: () => auth.api.createAdminUser({ displayName, telegramId: telegramId || undefined, role: 'MANAGER', status: 'INVITED', profile: { displayName } }),
+    onSuccess: async () => {
+      setDisplayName('')
+      setTelegramId('')
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'managers'] })
+    },
+  })
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Managers</CardTitle>
+        <CardDescription>Create, invite, and supervise managers.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {(auth.user?.role === 'OWNER' || auth.user?.role === 'ADMIN') && (
+          <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_160px_auto]">
+            <input className="h-10 rounded-md border bg-background px-3" placeholder="Display name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+            <input className="h-10 rounded-md border bg-background px-3" placeholder="Telegram ID" value={telegramId} onChange={(event) => setTelegramId(event.target.value)} />
+            <Button disabled={!displayName || createManager.isPending} onClick={() => createManager.mutate()}>Invite</Button>
+          </div>
+        )}
+        {createManager.error && <ErrorText error={createManager.error} />}
+        <div className="grid gap-3 md:grid-cols-2">
+          {managers.data?.managers.map((manager) => (
+            <ManagerRow key={manager.id} manager={manager} />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+type ManagerSummary = {
+  id: string
+  email: string
+  displayName?: string | null
+  role: string
+  status: string
+  managerProfile?: {
+    workingStatus?: string | null
+  } | null
+}
+
+function ManagerRow({ manager }: { manager: ManagerSummary }) {
+  const auth = useAuth()
+  const queryClient = useQueryClient()
+  const status = useMutation({
+    mutationFn: (nextStatus: string) => auth.api.updateAdminUserStatus(manager.id, nextStatus),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'managers'] }),
+  })
+  return (
+    <div className="grid gap-3 rounded-md border p-4">
+      <Row title={`${manager.displayName ?? manager.email} · ${manager.role}`} detail={`${manager.status} · ${manager.managerProfile?.workingStatus ?? 'profile pending'}`} />
+      {(auth.user?.role === 'OWNER' || auth.user?.role === 'ADMIN') && (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => status.mutate('ACTIVE')}>Activate</Button>
+          <Button size="sm" variant="outline" onClick={() => status.mutate('DISABLED')}>Disable</Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Metrics() {
+  const auth = useAuth()
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const params = useMemo(() => {
+    const query = new URLSearchParams()
+    if (from) query.set('from', from)
+    if (to) query.set('to', to)
+    return query.size ? `?${query.toString()}` : ''
+  }, [from, to])
+  const overview = useQuery({ queryKey: ['admin', 'metrics', params], queryFn: () => auth.api.adminMetricsOverview(params) })
+  const managers = useQuery({ queryKey: ['admin', 'metrics', 'managers', params], queryFn: () => auth.api.adminMetricsManagers(params) })
+  const data = overview.data?.metrics
+
+  return (
+    <div className="grid gap-4">
+      <Card>
+        <CardContent className="flex flex-wrap gap-2">
+          <input className="h-10 rounded-md border bg-background px-3" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+          <input className="h-10 rounded-md border bg-background px-3" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+        </CardContent>
+      </Card>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Total managers" value={data?.totalManagers ?? 0} />
+        <Metric label="Active managers" value={data?.activeManagers ?? 0} />
+        <Metric label="Leads today" value={data?.leadsToday ?? 0} />
+        <Metric label="Success deals" value={data?.successfulDealsToday ?? 0} />
+        <Metric label="Cancelled" value={data?.cancelledDealsToday ?? 0} />
+        <Metric label="Amount" value={`AED ${(data?.totalAmountToday ?? 0).toLocaleString()}`} />
+        <Metric label="Conversion" value={`${data?.conversionRate ?? 0}%`} />
+        <Metric label="Avg response" value={`${data?.averageResponseSeconds ?? 0}s`} />
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Leaderboard</CardTitle>
+          <CardDescription>Manager performance for the selected period.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {managers.data?.managers.map((row) => (
+            <Row key={row.manager?.id ?? row.managerId} title={`${row.manager?.displayName ?? 'Manager'} · AED ${row.totalAmount}`} detail={`${row.dealsSuccess} success · ${row.dealsCancelled} cancelled · ${row.conversionRate}%`} />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function Functions() {
+  const auth = useAuth()
+  const queryClient = useQueryClient()
+  const functions = useQuery({ queryKey: ['admin', 'functions'], queryFn: () => auth.api.adminFunctions() })
+  const toggle = useMutation({
+    mutationFn: ({ key, enabled }: { key: string; enabled: boolean }) => auth.api.updateAdminFunction(key, { enabled }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'functions'] }),
+  })
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Functions</CardTitle>
+        <CardDescription>Editable operational toggles and JSON-backed settings.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {functions.data?.functions.map((setting) => (
+          <div key={setting.key} className="flex flex-wrap items-center gap-3 rounded-md border p-3">
+            <Row title={setting.title} detail={`${setting.key} · ${setting.description ?? 'No description'}`} />
+            <Button className="ml-auto" variant="outline" onClick={() => toggle.mutate({ key: setting.key, enabled: !setting.enabled })}>
+              {setting.enabled ? 'Disable' : 'Enable'}
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+function Scripts() {
+  const auth = useAuth()
+  const queryClient = useQueryClient()
+  const scripts = useQuery({ queryKey: ['admin', 'scripts'], queryFn: () => auth.api.adminScripts() })
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const createScript = useMutation({
+    mutationFn: () => auth.api.createAdminScript({ title, body, category: 'custom', enabled: true }),
+    onSuccess: async () => {
+      setTitle('')
+      setBody('')
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'scripts'] })
+    },
+  })
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sales Scripts</CardTitle>
+        <CardDescription>Templates managers can use in Telegram lead conversations.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <div className="grid gap-2 rounded-md border p-3">
+          <input className="h-10 rounded-md border bg-background px-3" placeholder="Title" value={title} onChange={(event) => setTitle(event.target.value)} />
+          <textarea className="min-h-24 rounded-md border bg-background px-3 py-2" placeholder="Script body" value={body} onChange={(event) => setBody(event.target.value)} />
+          <Button className="w-fit" disabled={!title || !body || createScript.isPending} onClick={() => createScript.mutate()}>Save script</Button>
+        </div>
+        <div className="grid gap-3">
+          {scripts.data?.scripts.map((script) => (
+            <Row key={script.id} title={`${script.title} · ${script.enabled ? 'enabled' : 'disabled'}`} detail={script.body} />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Settings() {
+  const auth = useAuth()
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Settings</CardTitle>
+        <CardDescription>User and Mini App runtime details.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        <StatusRow label="Role" value={auth.user?.role ?? 'unknown'} />
+        <StatusRow label="Status" value={auth.user?.status ?? 'unknown'} />
+        <StatusRow label="Telegram ID" value={auth.user?.telegramId ?? 'not linked'} />
+      </CardContent>
+    </Card>
+  )
+}
+
 function Admin() {
   const auth = useAuth()
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: () => auth.api.dashboard() })
@@ -432,6 +694,13 @@ function TelegramAuthScreen() {
   const isDev = import.meta.env.DEV
 
   useEffect(() => {
+    if (!document.querySelector('script[data-telegram-webapp-sdk]')) {
+      const script = document.createElement('script')
+      script.src = 'https://telegram.org/js/telegram-web-app.js'
+      script.async = true
+      script.dataset.telegramWebappSdk = 'true'
+      document.head.appendChild(script)
+    }
     const webApp = window.Telegram?.WebApp ?? null
     webApp?.ready()
     webApp?.expand?.()
@@ -460,7 +729,7 @@ function TelegramAuthScreen() {
       <Card>
         <CardHeader>
           <Badge variant="outline" className="w-fit border-amber-400/60 bg-amber-50 text-amber-900">Telegram Mini App</Badge>
-          <CardTitle className="text-4xl">ROLF Sales App</CardTitle>
+          <CardTitle>ROLF Sales App</CardTitle>
           <CardDescription>Secure sign-in for the Dubai sales representative MVP.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -478,43 +747,54 @@ function TelegramAuthScreen() {
               </Button>
             )}
           </div>
-          <Separator />
-          <div className="grid gap-3">
-            <Typography variant="h6">Demo email login</Typography>
-            <input
-              aria-label="Demo email"
-              className="h-10 rounded-md border bg-background px-3"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-            <input
-              aria-label="Demo password"
-              className="h-10 rounded-md border bg-background px-3"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <Button className="w-fit" disabled={isSubmitting} onClick={() => void submit(() => auth.login({ email, password }))}>
-              Войти как demo user
-            </Button>
-          </div>
+          {!telegramWebApp && (
+            <Typography variant="bodySm" tone="muted">
+              Open this URL from the configured Telegram bot menu or direct Mini App link. Browser mode does not grant admin access.
+            </Typography>
+          )}
+          {isDev && (
+            <>
+              <Separator />
+              <div className="grid gap-3">
+                <Typography variant="h6">Local dev login</Typography>
+                <input
+                  aria-label="Demo email"
+                  className="h-10 rounded-md border bg-background px-3"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+                <input
+                  aria-label="Demo password"
+                  className="h-10 rounded-md border bg-background px-3"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <Button className="w-fit" disabled={isSubmitting} onClick={() => void submit(() => auth.login({ email, password }))}>
+                  Войти как local dev user
+                </Button>
+              </div>
+            </>
+          )}
           {error && <Typography variant="bodySm" className="text-destructive">{error}</Typography>}
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Demo users</CardTitle>
-          <CardDescription>Email/password auth remains available through the API.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-2">
-          {['rep1@rolf-demo.local', 'manager@rolf-demo.local', 'admin@rolf-demo.local'].map((demoEmail) => (
-            <Button key={demoEmail} variant="outline" onClick={() => setEmail(demoEmail)}>
-              {demoEmail}
-            </Button>
-          ))}
-          <Typography variant="bodySm" tone="muted">Password: DemoPass123!</Typography>
-        </CardContent>
-      </Card>
+      {isDev && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Local users</CardTitle>
+            <CardDescription>Visible only in Vite development mode.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {['rep1@rolf-demo.local', 'manager@rolf-demo.local', 'admin@rolf-demo.local'].map((demoEmail) => (
+              <Button key={demoEmail} variant="outline" onClick={() => setEmail(demoEmail)}>
+                {demoEmail}
+              </Button>
+            ))}
+            <Typography variant="bodySm" tone="muted">Password: DemoPass123!</Typography>
+          </CardContent>
+        </Card>
+      )}
     </section>
   )
 }
@@ -537,7 +817,7 @@ function Metric({ label, value }: { label: string; value: string | number }) {
     <Card>
       <CardHeader>
         <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-3xl">{value}</CardTitle>
+        <CardTitle>{value}</CardTitle>
       </CardHeader>
     </Card>
   )
@@ -572,6 +852,14 @@ function LoadingCard({ title }: { title: string }) {
   )
 }
 
+function EmptyState({ title }: { title: string }) {
+  return (
+    <div className="rounded-md border border-dashed p-4">
+      <Typography variant="bodySm" tone="muted">{title}</Typography>
+    </div>
+  )
+}
+
 function ErrorText({ error }: { error: unknown }) {
   return (
     <Typography variant="bodySm" className="text-destructive">
@@ -581,9 +869,22 @@ function ErrorText({ error }: { error: unknown }) {
 }
 
 function roleLabel(role: string) {
-  if (role === 'SALES_REP') return 'Торговый представитель'
+  if (role === 'OWNER') return 'Владелец'
+  if (role === 'ADMIN') return 'Администратор'
+  if (role === 'SUPERVISOR') return 'Супервизор'
   if (role === 'MANAGER') return 'Менеджер'
-  return 'Администратор'
+  return 'Наблюдатель'
+}
+
+function viewFromPath(path: string): View {
+  if (path.includes('/admin/managers')) return 'managers'
+  if (path.includes('/admin/functions')) return 'functions'
+  if (path.includes('/admin/scripts')) return 'scripts'
+  if (path.includes('/admin/metrics')) return 'metrics'
+  if (path.includes('/admin')) return 'admin'
+  if (path.includes('/leads')) return 'leads'
+  if (path.includes('/settings')) return 'settings'
+  return 'today'
 }
 
 function updateOrderItem(

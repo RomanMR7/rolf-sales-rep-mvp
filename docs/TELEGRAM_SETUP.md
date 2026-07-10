@@ -33,6 +33,24 @@ https://rolf-sales-rep-mvp-webapp.vercel.app
 ```
 
 8. Set the Mini App URL to the Vercel URL.
+9. In BotFather configure both production entry points when available:
+
+```text
+Main Mini App URL: https://rolf-sales-rep-mvp-webapp.vercel.app
+Menu Button URL: https://rolf-sales-rep-mvp-webapp.vercel.app
+/start command: Opens the ROLF Sales App Mini App
+Direct link: https://t.me/<botusername>?startapp
+```
+
+The backend exposes launch metadata at:
+
+```text
+GET /telegram/config
+GET /api/telegram/config
+```
+
+It returns the configured bot username, webapp URL, menu URL, `/start` command, and direct `startapp` link when `TELEGRAM_BOT_USERNAME` is set.
+
 9. Set backend env to the same frontend origin:
 
 ```env
@@ -95,10 +113,19 @@ DATABASE_URL=postgresql://...
 JWT_SECRET=<random-32-plus-character-secret>
 CORS_ORIGINS=https://rolf-sales-rep-mvp-webapp.vercel.app
 COOKIE_SECURE=true
+BOT_TOKEN=<token-from-BotFather>
 TELEGRAM_BOT_TOKEN=<token-from-BotFather>
+TELEGRAM_BOT_USERNAME=<botusername>
+WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
 TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
+BACKEND_PUBLIC_URL=https://rolf-sales-rep-mvp-backend.onrender.com
+ADMIN_TELEGRAM_IDS=123456789,987654321
 ALLOW_DEV_AUTH=false
 ```
+
+`BOT_TOKEN`/`WEBAPP_URL` are accepted aliases for `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBAPP_URL`. Prefer setting the explicit `TELEGRAM_*` names in Render, and keep aliases only when a provider or bot integration already uses them.
+
+`ADMIN_TELEGRAM_IDS` bootstraps the first owner accounts. A Telegram user whose signed `initData` has an ID in that comma-separated list becomes `OWNER` with `ACTIVE` status. Unknown Telegram users become `VIEWER` with `INVITED` status until an owner/admin promotes or activates them.
 
 Local development may use dev auth only with both flags:
 
@@ -111,6 +138,13 @@ ALLOW_DEV_AUTH=true
 ## Backend Auth Endpoint
 
 `POST /api/auth/telegram`
+
+Compatibility aliases:
+
+```text
+POST /auth/telegram
+GET /me
+```
 
 Telegram payload:
 
@@ -146,4 +180,13 @@ Local-only dev payload:
 
 ## Minimal Bot Behavior
 
-For staging, BotFather's Menu Button / Configure Mini App is enough to open the app. A custom `/start` handler can later reply with an inline button pointing to `TELEGRAM_WEBAPP_URL`, but it is not required for the first Telegram WebView validation.
+For staging, BotFather's Menu Button / Configure Mini App is enough to open the app. The backend now includes a minimal dependency-free bot helper in `backend/src/telegram/bot.ts` for `/start`, `/help`, and `/settings`. It builds an inline keyboard button with `web_app.url = TELEGRAM_WEBAPP_URL`; deploy it behind webhook or polling when the bot needs command replies beyond BotFather's menu button.
+
+Render env vars for that bot layer:
+
+```env
+TELEGRAM_BOT_TOKEN=<token-from-BotFather>
+TELEGRAM_BOT_USERNAME=<botusername>
+TELEGRAM_WEBAPP_URL=https://rolf-sales-rep-mvp-webapp.vercel.app
+BACKEND_PUBLIC_URL=https://rolf-sales-rep-mvp-backend.onrender.com
+```
