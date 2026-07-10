@@ -45,6 +45,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let isMounted = true
+    const canBootstrapSession = import.meta.env.DEV || Boolean(window.Telegram?.WebApp)
+    if (!canBootstrapSession) {
+      setIsBootstrapping(false)
+      return () => {
+        isMounted = false
+      }
+    }
+
     const bootstrapApi = new ApiClient({
       getAccessToken: () => null,
       setAccessToken,
