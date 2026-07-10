@@ -612,3 +612,38 @@ Validation:
 * Stabilized `webapp/tests/typography-render.test.tsx` by giving its heavy runtime UI import/render smoke a 15-second timeout.
 * Final `bun run --cwd webapp test` passed: 42 pass, 0 fail.
 * Final `bun run test` passed.
+
+## Deploy Automation Check - 2026-07-10
+
+User correction:
+
+* Do not ask the user to manually redeploy Vercel or Render when Codex can verify or trigger deploys.
+* If provider access is unavailable, state that plainly instead of pretending to deploy.
+
+Access check:
+
+* `vercel` CLI unavailable.
+* `render` CLI unavailable.
+* `gh` CLI unavailable.
+* No local `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_ORG_ID`, `RENDER_API_KEY`, `RENDER_TOKEN`, `RENDER_SERVICE_ID`, `VERCEL_DEPLOY_HOOK_URL`, or `RENDER_DEPLOY_HOOK_URL` environment variables were present.
+* No `.vercel/project.json` was present locally.
+* Therefore Codex can push to GitHub and check public URLs/GitHub statuses, but cannot create deploy hooks or call Vercel/Render account APIs without tokens or hook URLs.
+
+Observed deploy status:
+
+* GitHub commit status for `a5db355` reported `Vercel success` with a Vercel deployment URL.
+* Public Vercel bundle at `https://rolf-sales-rep-mvp-webapp.vercel.app` contained `https://rolf-sales-rep-mvp-backend.onrender.com`, did not contain `VITE_API_URL is not configured`, and did contain the new `Backend is unreachable. Checked:` fallback error text.
+* This confirms Vercel auto deploy from GitHub worked for the frontend commit.
+* No Render deployment status was visible through public GitHub statuses/check-runs. Without Render API token or deploy hook URL, Render auto deploy status cannot be confirmed directly from this environment.
+
+CI follow-up:
+
+* GitHub Actions `validate` failed on `a5db355` during root `bun run typecheck`.
+* Reproduced locally: `packages/contracts/src/auth.test.ts` inferred `validUser.role` as `string` instead of `UserDto` role union.
+* Fixed by typing `validUser` as `UserDto`.
+* Root `bun run typecheck` then passed.
+* Full requested validation passed again:
+  `bun run --cwd webapp build`, `bun run --cwd webapp typecheck`,
+  `bun test webapp/tests/api.test.ts webapp/tests/auth-queries.test.ts webapp/tests/e2e-env.test.ts`,
+  `bun run --cwd backend typecheck`, `bun run test:contracts`,
+  `bun run smoke:backend:docker`, and `bun run test`.

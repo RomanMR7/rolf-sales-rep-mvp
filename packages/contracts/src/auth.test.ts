@@ -9,9 +9,10 @@ import {
   refreshRequestSchema,
   refreshResponseSchema,
   registerRequestSchema,
+  type UserDto,
 } from './index'
 
-const validUser = {
+const validUser: UserDto = {
   id: 'user_1',
   email: 'user@example.com',
   displayName: null,
