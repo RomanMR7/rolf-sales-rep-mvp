@@ -2,6 +2,10 @@ FROM oven/bun:1
 
 WORKDIR /app
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends nodejs ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json bun.lock bunfig.toml ./
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY backend/package.json backend/package.json

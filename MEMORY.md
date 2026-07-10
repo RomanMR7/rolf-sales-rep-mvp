@@ -533,3 +533,37 @@ Docs updated:
 * `README.md`
 * `docs/BACKEND_STAGING_DEPLOY.md`
 * `docs/STAGING_CHECKLIST.md`
+
+## Render Prisma 7 Startup Diagnostics Fix - 2026-07-10
+
+User reported:
+
+* Render deploy commit `3f32adac` failed after:
+  `Checking DATABASE_URL...`, `Running Prisma migrations...`, `$ prisma migrate deploy`.
+* Container exited with status 1 and no visible Prisma stderr.
+* Render `DATABASE_URL` existed, Render PostgreSQL 18 was Available, Internal Database URL was used, and Docker image built successfully.
+
+Root cause found:
+
+* `prisma@7.8.0` declares Node runtime requirement `^20.19 || ^22.12 || >=24`.
+* Base image `oven/bun:1` did not contain `node`.
+* Startup ran migrations through `bun run --cwd backend prisma:deploy`, which executes Prisma CLI through Bun and can hide/lose useful failure output on Render.
+* `DEBUG=prisma:*` was tested and rejected because it prints the full datasource URL, including password.
+
+Fix:
+
+* Dockerfile now installs Debian `nodejs` 20.19.x for Prisma CLI 7.
+* `backend/scripts/render-start.sh` now runs Prisma directly with:
+  `node node_modules/prisma/build/index.js migrate deploy --config backend/prisma.config.ts --schema backend/prisma/schema.prisma`.
+* Migration command is wrapped with `set +e`, `2>&1`, explicit `Prisma migrate deploy exit code: ...`, and failure exit.
+* Added `backend/scripts/startup-diagnostics.ts`.
+* Startup diagnostics print cwd, Bun version, Node version, Prisma CLI version, schema/config presence, sanitized DB hostname/port/database/schema, DNS resolution, TCP connection, and Prisma `SELECT 1`.
+* Startup diagnostics never print full `DATABASE_URL`, DB username/password, or Telegram token.
+
+Validation:
+
+* `bun run --cwd backend typecheck` passed.
+* `bun run --cwd backend test:unit` passed.
+* `bun run smoke:backend:docker` passed, including clean PostgreSQL 18 startup, repeated startup, visible connection failure diagnostics, and visible migration wrapper failure diagnostics.
+* `bun run test:webapp` passed after one flaky 5-second typography render timeout.
+* Final `bun run test` passed.

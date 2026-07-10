@@ -28,7 +28,16 @@ Use this checklist before showing the MVP through Telegram.
 - `TELEGRAM_BOT_TOKEN` is configured in secret/env storage.
 - `TELEGRAM_WEBAPP_URL` matches the Vercel Mini App URL.
 - Deploy logs show `Checking DATABASE_URL...`.
+- Deploy logs show `Running startup diagnostics...`.
+- Deploy logs show `node --version:`.
+- Deploy logs show `Prisma CLI entrypoint exists: node_modules/prisma/build/index.js`.
+- Deploy logs show `Database hostname:`.
+- Deploy logs show `DNS resolution for database hostname:`.
+- Deploy logs show `TCP connection to database`.
+- Deploy logs show `Prisma SELECT 1 diagnostic: ok`.
+- Deploy logs show `Startup diagnostics completed.`.
 - Deploy logs show `Running Prisma migrations...`.
+- Deploy logs show `Prisma migrate deploy exit code: 0`.
 - Deploy logs show `Prisma migrations completed.`.
 - Deploy logs show `Running seed...`.
 - Deploy logs show `Seed completed.`.
@@ -45,6 +54,7 @@ Backend deploy settings checked:
 - Start Command: Dockerfile `CMD ["sh", "backend/scripts/render-start.sh"]`.
 - Health Check Path: `/health`.
 - Backend binds to `0.0.0.0` and reads provider `PORT`.
+- Docker image contains Node.js for Prisma CLI 7 and Bun for the backend runtime.
 - No Render Shell, One-Off Job, paid job, or Pre-Deploy Command is required.
 
 Database setup checked:

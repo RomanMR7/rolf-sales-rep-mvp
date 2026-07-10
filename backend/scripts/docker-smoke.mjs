@@ -31,7 +31,17 @@ const dockerEnv = composeEnv({
 })
 const expectedStartupLogs = [
   'Checking DATABASE_URL...',
+  'Running startup diagnostics...',
+  'node --version:',
+  'Prisma CLI entrypoint exists: node_modules/prisma/build/index.js',
+  'Prisma CLI version:',
+  'Database hostname:',
+  'DNS resolution for database hostname:',
+  'TCP connection to database',
+  'Prisma SELECT 1 diagnostic: ok',
+  'Startup diagnostics completed.',
   'Running Prisma migrations...',
+  'Prisma migrate deploy exit code: 0',
   'Prisma migrations completed.',
   'Running seed...',
   'Seed completed.',
@@ -226,6 +236,90 @@ function assertStartupLogs() {
   process.stdout.write('Backend Docker startup logs smoke passed\n')
 }
 
+function assertMigrationFailureIsVisible() {
+  const result = spawnSync('docker', [
+    'run',
+    '--rm',
+    '--network',
+    networkName,
+    '-e',
+    'PORT=3000',
+    '-e',
+    'DATABASE_URL=postgresql://superuser:wrong-password@postgres_test:5432/rolf_sales_rep_mvp_test?schema=public',
+    '-e',
+    'JWT_SECRET=docker-smoke-secret-at-least-thirty-two-characters',
+    '-e',
+    'CORS_ORIGINS=http://localhost:45174',
+    '-e',
+    'COOKIE_SECURE=false',
+    imageName,
+  ], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  })
+
+  const logs = `${result.stdout}\n${result.stderr}`
+  if (result.status === 0) {
+    process.stderr.write('Expected backend Docker startup to fail with invalid database credentials.\n')
+    process.stderr.write(logs)
+    process.exit(1)
+  }
+
+  const expectedFailureLogs = [
+    'Prisma SELECT 1 diagnostic failed:',
+  ]
+  for (const expectedLog of expectedFailureLogs) {
+    if (!logs.includes(expectedLog)) {
+      process.stderr.write(`Backend Docker failure log did not include: ${expectedLog}\n`)
+      process.stderr.write(logs)
+      process.exit(1)
+    }
+  }
+
+  process.stdout.write('Backend Docker failure diagnostics smoke passed\n')
+}
+
+function assertMigrationWrapperFailureIsVisible() {
+  const result = spawnSync('docker', [
+    'run',
+    '--rm',
+    imageName,
+    'sh',
+    '-lc',
+    [
+      'set +e',
+      'node node_modules/prisma/build/index.js migrate deploy --config backend/missing-prisma.config.ts --schema backend/prisma/schema.prisma 2>&1',
+      'MIGRATION_EXIT_CODE=$?',
+      'set -e',
+      'echo "Prisma migrate deploy exit code: $MIGRATION_EXIT_CODE"',
+      'if [ "$MIGRATION_EXIT_CODE" -eq 0 ]; then exit 1; fi',
+    ].join('; '),
+  ], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  })
+
+  const logs = `${result.stdout}\n${result.stderr}`
+  if (result.status !== 0) {
+    process.stderr.write('Expected migration wrapper visibility check to finish after observing a non-zero migration exit.\n')
+    process.stderr.write(logs)
+    process.exit(result.status ?? 1)
+  }
+
+  for (const expectedLog of [
+    'backend/missing-prisma.config.ts',
+    'Prisma migrate deploy exit code:',
+  ]) {
+    if (!logs.includes(expectedLog)) {
+      process.stderr.write(`Migration wrapper failure log did not include: ${expectedLog}\n`)
+      process.stderr.write(logs)
+      process.exit(1)
+    }
+  }
+
+  process.stdout.write('Backend Docker migration failure visibility smoke passed\n')
+}
+
 try {
   runBackendContainer()
   await waitForHealth()
@@ -238,6 +332,9 @@ try {
   await waitForHealth()
   assertStartupLogs()
   process.stdout.write('Backend Docker idempotent restart smoke passed\n')
+
+  assertMigrationFailureIsVisible()
+  assertMigrationWrapperFailureIsVisible()
 } finally {
   spawnSync('docker', ['rm', '-f', containerName], { stdio: 'ignore' })
 }

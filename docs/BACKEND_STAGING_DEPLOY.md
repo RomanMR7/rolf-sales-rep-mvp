@@ -29,7 +29,7 @@ Do not commit real env values or secrets.
 - Public protocol: HTTPS
 - Port: provider `PORT` environment variable
 
-The Dockerfile installs the monorepo dependencies, copies `packages/contracts` and `backend`, generates Prisma Client, returns to repo root `/app`, and starts `backend/scripts/render-start.sh`. That script checks `DATABASE_URL`, applies Prisma migrations, runs the safe idempotent seed, and only then starts the Hono/Bun API. The server binds to `0.0.0.0` and reads the port from `PORT`.
+The Dockerfile installs Node.js alongside Bun because Prisma CLI 7 declares a Node runtime requirement. It installs the monorepo dependencies, copies `packages/contracts` and `backend`, generates Prisma Client, returns to repo root `/app`, and starts `backend/scripts/render-start.sh`. That script checks `DATABASE_URL`, prints safe startup diagnostics, applies Prisma migrations through `node node_modules/prisma/build/index.js`, runs the safe idempotent seed, and only then starts the Hono/Bun API. The server binds to `0.0.0.0` and reads the port from `PORT`.
 
 ## Render Deploy
 
@@ -43,7 +43,16 @@ The repository includes `render.yaml` for a Render Blueprint.
 6. Deploy the service.
 7. Watch the deploy logs for:
    - `Checking DATABASE_URL...`
+   - `Running startup diagnostics...`
+   - `node --version:`
+   - `Prisma CLI entrypoint exists: node_modules/prisma/build/index.js`
+   - `Database hostname:`
+   - `DNS resolution for database hostname:`
+   - `TCP connection to database ...: ok`
+   - `Prisma SELECT 1 diagnostic: ok`
+   - `Startup diagnostics completed.`
    - `Running Prisma migrations...`
+   - `Prisma migrate deploy exit code: 0`
    - `Prisma migrations completed.`
    - `Running seed...`
    - `Seed completed.`
@@ -58,6 +67,7 @@ Render Blueprint notes:
 - `dockerContext: .`
 - `healthCheckPath: /health`
 - migrations and seed run from the container startup script
+- Prisma CLI runs directly through Node.js, not through `bun run --cwd backend prisma:deploy`
 - sensitive env values are not stored in git
 - current Vercel origin is already wired into `CORS_ORIGINS` and `TELEGRAM_WEBAPP_URL`
 - no Render Shell, One-Off Jobs, paid jobs, or Pre-Deploy Command are required
@@ -154,3 +164,4 @@ https://rolf-sales-rep-mvp-webapp.vercel.app
 - `COOKIE_SECURE=true` for HTTPS.
 - Never commit `.env` files or provider secrets.
 - If migrations or seed fail, the container exits and the backend does not start in a partially initialized state.
+- Startup diagnostics print only the database hostname, port, database name, and schema parameter. They never print the full `DATABASE_URL`, username, password, or Telegram token.

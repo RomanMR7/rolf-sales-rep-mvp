@@ -75,7 +75,7 @@ Render backend settings:
 - Health Check Path: `/health`
 - Port: provider `PORT` environment variable; the backend binds to `0.0.0.0`
 
-The repository includes `render.yaml` for Render Blueprint setup on the Render Free Web Service plan. There is no Render Shell, One-Off Job, or Pre-Deploy Command requirement: every container start checks `DATABASE_URL`, applies Prisma migrations, runs the safe idempotent seed, and only then starts the backend. See [Backend staging deploy](docs/BACKEND_STAGING_DEPLOY.md).
+The repository includes `render.yaml` for Render Blueprint setup on the Render Free Web Service plan. There is no Render Shell, One-Off Job, or Pre-Deploy Command requirement: every container start checks `DATABASE_URL`, prints safe startup diagnostics, applies Prisma migrations through the Prisma 7 CLI under Node.js, runs the safe idempotent seed, and only then starts the backend. See [Backend staging deploy](docs/BACKEND_STAGING_DEPLOY.md).
 
 Current Vercel frontend origin:
 
