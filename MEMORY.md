@@ -750,3 +750,26 @@ CI follow-up:
 * User requested removing the old demo wording about "visit -> order -> manager approval" and replacing it with clear usage/setup instructions for all roles.
 * Replaced the dashboard intro card with a role guide covering quick start, owner/admin setup, manager workflow, and role access boundaries.
 * Validation passed: `bun run --cwd webapp typecheck`, `bun run --cwd webapp test`, `bun run --cwd webapp build`, and `bun run --cwd webapp lint`.
+
+## ROLF Lubricants Dubai Industrial UI Redesign - 2026-07-11
+
+* User requested a full in-place redesign of the existing application in a premium industrial ROLF Lubricants Dubai style without changing business logic, API, routes, roles, or auth.
+* Implemented centralized brand tokens in `webapp/src/index.css` using the requested black/graphite/red/gold palette, dark surfaces, focus states, panel/field utilities, technical grid background, tabular numbers, and reduced-motion support.
+* Updated core UI primitives (`button`, `card`, `badge`, `typography`) plus mechanically tightened overly rounded shadcn primitives from `rounded-4xl` to stricter geometry.
+* Reworked `webapp/src/pages.tsx` with desktop sidebar, mobile bottom navigation with extra-section menu, branded header/hero, page headers, user panel, KPI cards, status badges, stronger loading/empty/error states, labeled form fields, responsive grids, and industrial panels across dashboard, owner, leads, clients, catalog, orders, visits, managers, metrics, functions, scripts, settings, admin, and auth screens.
+* Kept API calls, mutations, auth/session behavior, roles, owner modes, Telegram SDK loading, and data flow intact.
+* Validation passed: `bun install`, `bun run --cwd webapp typecheck`, `bun run --cwd webapp lint`, `bun run --cwd webapp test`, `bun run test:contracts`, `bun run --cwd webapp build`, root `bun run typecheck`, root `bun run test`, and root `bun run build`.
+* Visual smoke checked local webapp at 1440, 390, and 320 px via Playwright using an existing Chromium executable: unauthenticated Mini App page rendered, no horizontal overflow. Console showed only expected local backend connection-refused errors because backend was not running during that smoke check.
+* Build warning remains: Vite reports webapp JS chunk `526.44 kB` after minification, suggesting future code splitting; this is a warning, not a failing build.
+
+## Git Root and Local Backend Smoke Fix - 2026-07-11
+
+* The actual repository root is `C:\Users\User\Documents\TG APP ROLF JOB\rolf-sales-rep-mvp`; the parent folder `C:\Users\User\Documents\TG APP ROLF JOB` contains a separate empty `.git` on `master` with no commits, which made the whole project appear untracked when commands were run one level too high.
+* Real repo state before commit: branch `main`, HEAD `9b83a2a763849da6c4c4837cef2b5b73d480190c`, remote `https://github.com/RomanMR7/rolf-sales-rep-mvp.git`.
+* Local frontend config `webapp/.env` uses `VITE_API_URL=http://localhost:3000`; previous Playwright smoke saw `ERR_CONNECTION_REFUSED` because local backend was not running.
+* Brought up local Postgres with `docker compose up -d postgres`, confirmed healthy, ran `bun run --cwd backend prisma:deploy`, `bun run seed`, started backend with `bun run --cwd backend start:api`, and verified `http://localhost:3000/health` returned `{"status":"ok"}`.
+* Initial visual smoke from `http://127.0.0.1:5173` hit CORS because backend allows `http://localhost:5173`; reran smoke on `http://localhost:5173`.
+* Fixed decorative auth/hero overlays in `webapp/src/pages.tsx` with `pointer-events-none` because the auth overlay intercepted clicks on the local login button.
+* Fixed clean browser fallback console noise in `webapp/src/lib/auth.tsx`: bootstrap refresh now runs only in Telegram WebApp or when `cachedMe` exists, and logout/auth-expiry clears `cachedMe`.
+* Final Playwright smoke passed at 1440, 390, and 320 px: auth screen, local login, dashboard, navigation to leads/orders/visits/settings, no horizontal overflow, no console errors, no failed requests, no `ERR_CONNECTION_REFUSED`.
+* Final validation passed again: `bun install`, webapp typecheck/lint/test/build, `bun run test:contracts`, root `bun run typecheck`, root `bun run test`, and root `bun run build`.

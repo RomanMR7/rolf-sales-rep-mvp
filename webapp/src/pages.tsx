@@ -16,10 +16,30 @@ const navLinkClass = cn(
   'text-muted-foreground data-[status=active]:border data-[status=active]:border-primary/30 data-[status=active]:bg-primary/12 data-[status=active]:text-primary data-[status=active]:hover:bg-primary/16'
 )
 
-const panelClass = 'rounded-xl border border-border/70 bg-card/72 p-4 shadow-[0_18px_46px_-36px_black]'
-const fieldClass = 'h-10 rounded-lg border px-3'
+const panelClass = 'rolf-panel rounded-2xl p-4'
+const fieldClass = 'rolf-field w-full'
+const formPanelClass = 'rolf-panel grid gap-3 rounded-2xl p-4'
+const listGridClass = 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'
 
 type View = 'today' | 'owner' | 'leads' | 'managers' | 'metrics' | 'settings' | 'functions' | 'scripts' | 'clients' | 'catalog' | 'orders' | 'visits' | 'admin'
+
+const navMeta: Record<View, { label: string; section: string; description: string }> = {
+  today: { label: 'Главная', section: 'Командный обзор', description: 'KPI, визиты, заказы и свежая операционная лента.' },
+  owner: { label: 'Владелец', section: 'Owner control', description: 'Режимы проверки ролей, impersonation и контроль доступа.' },
+  leads: { label: 'Заявки', section: 'Pipeline', description: 'Входящие обращения, ответственные и сумма потенциальной сделки.' },
+  managers: { label: 'Менеджеры', section: 'Команда', description: 'Приглашения, статусы и операционный контроль сотрудников.' },
+  metrics: { label: 'Метрики', section: 'Performance', description: 'Периоды, конверсия, оборот и рейтинг менеджеров.' },
+  settings: { label: 'Настройки', section: 'Профиль', description: 'Роль, статус, Telegram ID и параметры Mini App.' },
+  functions: { label: 'Функции', section: 'Feature flags', description: 'Операционные переключатели и рабочие возможности системы.' },
+  scripts: { label: 'Скрипты', section: 'Sales enablement', description: 'Шаблоны сообщений для единых продаж в Telegram.' },
+  clients: { label: 'Клиенты', section: 'Точки продаж', description: 'Клиентская база, визиты и быстрый старт заказа.' },
+  catalog: { label: 'Каталог', section: 'Номенклатура', description: 'SKU, категории, цены и фильтрация продуктов.' },
+  orders: { label: 'Заказы', section: 'Операции', description: 'Черновики, согласования, скидки и статус выполнения.' },
+  visits: { label: 'Визиты', section: 'Field work', description: 'Планирование, старт, завершение и пропуск визитов.' },
+  admin: { label: 'Админка', section: 'Admin', description: 'Административный обзор и доступные управленческие действия.' },
+}
+
+const mobilePrimaryViews: View[] = ['today', 'leads', 'orders', 'visits', 'settings']
 
 const workspaceGuide = [
   {
@@ -61,15 +81,15 @@ const workspaceGuide = [
 export function RootLayout() {
   return (
     <main className="min-h-svh bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/82 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/88 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link to="/" className="flex items-center gap-3">
-            <Typography as="span" variant="avatar" tone="inverse" className="grid size-10 place-items-center rounded-lg border border-primary/45 bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_var(--primary)]">
-              RS
+            <Typography as="span" variant="avatar" className="grid size-10 place-items-center rounded-[10px] border border-primary/45 bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_var(--brand-red)]">
+              RL
             </Typography>
             <span className="grid gap-0.5">
-              <Typography as="span" variant="h6">ROLF Dubai</Typography>
-              <Typography as="span" variant="bodyXs" tone="muted" className="block uppercase">Executive Sales Suite</Typography>
+              <Typography as="span" variant="h6">ROLF Lubricants Dubai</Typography>
+              <Typography as="span" variant="bodyXs" tone="muted" className="block uppercase">Industrial Sales Command</Typography>
             </span>
           </Link>
           <nav className="ml-auto flex items-center gap-1" aria-label="Primary">
@@ -99,6 +119,7 @@ function Workspace() {
   const auth = useAuth()
   const [view, setView] = useState<View>(() => viewFromPath(window.location.pathname))
   const [selectedClientId, setSelectedClientId] = useState<string>('')
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   if (auth.isBootstrapping) return <LoadingState />
   if (!auth.user) return <TelegramAuthScreen />
@@ -106,58 +127,165 @@ function Workspace() {
   const canAdmin = auth.user.role === 'OWNER' || auth.user.role === 'ADMIN'
   const canManageTeam = canAdmin || auth.user.role === 'SUPERVISOR'
   const canManage = canAdmin || auth.user.role === 'SUPERVISOR'
-  const views: Array<[View, string]> = [
-    ...(auth.session?.realRole === 'OWNER' ? [['owner', 'Владелец'] as [View, string]] : []),
-    ['today', 'Главная'],
-    ['leads', 'Заявки'],
-    ...(canManageTeam ? [['managers', 'Менеджеры'] as [View, string], ['metrics', 'Метрики'] as [View, string]] : []),
-    ['settings', 'Настройки'],
+  const views: View[] = [
+    ...(auth.session?.realRole === 'OWNER' ? ['owner' as View] : []),
+    'today',
+    'leads',
+    'clients',
+    'catalog',
+    'orders',
+    'visits',
+    ...(canManageTeam ? ['managers' as View, 'metrics' as View] : []),
+    ...(canAdmin ? ['functions' as View, 'scripts' as View, 'admin' as View] : []),
+    'settings',
   ]
+  const activeMeta = navMeta[view]
+  const mobileSecondaryViews = views.filter((item) => !mobilePrimaryViews.includes(item))
 
   return (
-    <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 pb-24 pt-5 sm:px-6">
-      <WorkspaceHero
-        displayName={auth.user.displayName ?? auth.user.email}
-        role={auth.user.role}
-        onLogout={() => void auth.logout()}
-      />
-      <OwnerModeBanner />
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/88 px-3 py-2 backdrop-blur-xl sm:hidden">
+    <section className="mx-auto grid w-full max-w-[var(--rolf-container)] gap-5 px-4 pb-28 pt-5 sm:px-6 lg:grid-cols-[280px_1fr] lg:pb-10">
+      <aside className="sticky top-20 hidden h-[calc(100svh-6rem)] flex-col overflow-hidden rounded-2xl border border-border bg-sidebar/88 p-3 shadow-[0_28px_80px_-54px_black] ring-1 ring-white/5 backdrop-blur lg:flex">
+        <div className="mb-4 grid gap-1 border-b border-border px-2 pb-4">
+          <Typography variant="bodyXs" tone="muted" className="uppercase">Navigation</Typography>
+          <Typography variant="h6">Command Center</Typography>
+        </div>
+        <nav className="grid gap-1 overflow-y-auto pr-1" aria-label="Workspace">
+          {views.map((item) => (
+            <WorkspaceNavButton key={item} item={item} isActive={view === item} onSelect={() => setView(item)} />
+          ))}
+        </nav>
+        <div className="mt-auto border-t border-border pt-4">
+          <UserPanel displayName={auth.user.displayName ?? auth.user.email} role={auth.user.role} onLogout={() => void auth.logout()} />
+        </div>
+      </aside>
+
+      <div className="grid min-w-0 gap-5">
+        <WorkspaceHero
+          displayName={auth.user.displayName ?? auth.user.email}
+          role={auth.user.role}
+          onLogout={() => void auth.logout()}
+        />
+        <OwnerModeBanner />
+        <PageHeader title={activeMeta.section} description={activeMeta.description} view={view} />
+        {view === 'owner' && auth.session?.realRole === 'OWNER' && <OwnerCommandCenter setView={setView} />}
+        {view === 'today' && <Dashboard />}
+        {view === 'leads' && <Leads canManage={auth.user.role !== 'VIEWER'} />}
+        {view === 'managers' && canManageTeam && <Managers />}
+        {view === 'metrics' && canManageTeam && <Metrics />}
+        {view === 'settings' && <Settings />}
+        {view === 'functions' && canAdmin && <Functions />}
+        {view === 'scripts' && canAdmin && <Scripts />}
+        {view === 'clients' && <Clients onCreateOrder={(clientId) => { setSelectedClientId(clientId); setView('orders') }} />}
+        {view === 'catalog' && <Catalog canManage={canManage} />}
+        {view === 'orders' && <Orders canManage={canManage} selectedClientId={selectedClientId} onSelectedClientIdChange={setSelectedClientId} />}
+        {view === 'visits' && <Visits />}
+        {view === 'admin' && canAdmin && <Admin />}
+      </div>
+
+      {isMobileMenuOpen && (
+        <div className="fixed inset-x-3 bottom-20 z-30 grid gap-2 rounded-2xl border border-border bg-popover/96 p-3 shadow-[0_28px_80px_-40px_black] backdrop-blur-xl lg:hidden">
+          {mobileSecondaryViews.map((item) => (
+            <Button key={item} variant={view === item ? 'default' : 'ghost'} className="justify-start" onClick={() => { setView(item); setIsMobileMenuOpen(false) }}>
+              {navMeta[item].label}
+            </Button>
+          ))}
+        </div>
+      )}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/92 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden">
         <nav className="mx-auto grid max-w-md grid-cols-5 gap-1" aria-label="Mini App">
-          {views.slice(0, 5).map(([key, label]) => (
-            <Button key={key} size="sm" variant={view === key ? 'default' : 'ghost'} className="h-11 px-1" onClick={() => setView(key)}>
-              <Typography as="span" variant="controlXs">{label}</Typography>
+          {mobilePrimaryViews.map((item) => (
+            <Button key={item} size="sm" variant={view === item ? 'default' : 'ghost'} className="h-11 px-1" onClick={() => { setView(item); setIsMobileMenuOpen(false) }}>
+              <Typography as="span" variant="controlXs">{navMeta[item].label}</Typography>
             </Button>
           ))}
         </nav>
-      </div>
-      <div className="hidden gap-2 overflow-x-auto pb-1 sm:flex">
-        {views.map(([key, label]) => (
-          <Button key={key} variant={view === key ? 'default' : 'outline'} onClick={() => setView(key)}>
-            {label}
+        {mobileSecondaryViews.length > 0 && (
+          <Button variant="outline" size="sm" className="mx-auto mt-2 flex w-full max-w-md" onClick={() => setIsMobileMenuOpen((value) => !value)}>
+            Еще разделы
           </Button>
-        ))}
-        {canAdmin && (
-          <>
-            <Button variant={view === 'functions' ? 'default' : 'outline'} onClick={() => setView('functions')}>Функции</Button>
-            <Button variant={view === 'scripts' ? 'default' : 'outline'} onClick={() => setView('scripts')}>Скрипты</Button>
-          </>
         )}
       </div>
-      {view === 'owner' && auth.session?.realRole === 'OWNER' && <OwnerCommandCenter setView={setView} />}
-      {view === 'today' && <Dashboard />}
-      {view === 'leads' && <Leads canManage={auth.user.role !== 'VIEWER'} />}
-      {view === 'managers' && canManageTeam && <Managers />}
-      {view === 'metrics' && canManageTeam && <Metrics />}
-      {view === 'settings' && <Settings />}
-      {view === 'functions' && canAdmin && <Functions />}
-      {view === 'scripts' && canAdmin && <Scripts />}
-      {view === 'clients' && <Clients onCreateOrder={(clientId) => { setSelectedClientId(clientId); setView('orders') }} />}
-      {view === 'catalog' && <Catalog canManage={canManage} />}
-      {view === 'orders' && <Orders canManage={canManage} selectedClientId={selectedClientId} onSelectedClientIdChange={setSelectedClientId} />}
-      {view === 'visits' && <Visits />}
-      {view === 'admin' && canAdmin && <Admin />}
     </section>
+  )
+}
+
+function WorkspaceNavButton({
+  item,
+  isActive,
+  onSelect,
+}: {
+  item: View
+  isActive: boolean
+  onSelect: () => void
+}) {
+  const meta = navMeta[item]
+  return (
+    <button
+      type="button"
+      className={cn(
+        'group relative grid min-h-12 gap-0.5 rounded-xl border border-transparent px-3 py-2 text-left transition-all duration-200 ease-out hover:border-border hover:bg-muted/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/20 focus-visible:outline-none',
+        isActive && 'border-border bg-muted text-foreground before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-primary',
+      )}
+      onClick={onSelect}
+    >
+      <Typography variant="control" className={cn(isActive ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground')}>
+        {meta.label}
+      </Typography>
+      <Typography variant="bodyXs" tone="muted" truncate>
+        {meta.section}
+      </Typography>
+    </button>
+  )
+}
+
+function UserPanel({
+  displayName,
+  role,
+  onLogout,
+}: {
+  displayName: string
+  role: string
+  onLogout: () => void
+}) {
+  return (
+    <div className="grid gap-3 rounded-xl border border-border bg-background/45 p-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <Typography as="span" variant="avatar" className="grid size-9 shrink-0 place-items-center rounded-[10px] border border-primary/35 bg-primary/14 text-primary">
+          {displayName.slice(0, 2).toUpperCase()}
+        </Typography>
+        <div className="min-w-0">
+          <Typography variant="bodySmMedium" truncate>{displayName}</Typography>
+          <Typography variant="bodyXs" tone="muted">{roleLabel(role)}</Typography>
+        </div>
+      </div>
+      <Button variant="outline" size="sm" onClick={onLogout}>
+        Выйти
+      </Button>
+    </div>
+  )
+}
+
+function PageHeader({
+  title,
+  description,
+  view,
+}: {
+  title: string
+  description: string
+  view: View
+}) {
+  return (
+    <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-border bg-card/54 p-4 shadow-[0_20px_60px_-48px_black]">
+      <div className="grid min-w-0 flex-1 gap-1">
+        <Typography variant="bodyXs" tone="muted" className="uppercase">ROLF Workspace / {navMeta[view].label}</Typography>
+        <Typography variant="h2">{title}</Typography>
+        <Typography variant="bodySm" tone="muted">{description}</Typography>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="outline" className="border-primary/35 bg-primary/12 text-primary">Live data</Badge>
+        <Badge variant="outline" className="border-[var(--brand-gold)]/45 bg-[var(--brand-gold-soft)] text-[var(--brand-gold)]">Dubai HQ</Badge>
+      </div>
+    </div>
   )
 }
 
@@ -176,7 +304,7 @@ function OwnerModeBanner() {
     ? `Вы смотрите приложение как ${roleLabel(session.effectiveRole)}. Реальная роль: ${roleLabel(session.realRole)}.`
     : `Режим владельца: вы работаете как ${session.effectiveUser.displayName ?? session.effectiveUser.email} / ${roleLabel(session.effectiveRole)}.`
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary/12 p-3">
+    <div className="rolf-panel flex flex-wrap items-center gap-3 rounded-2xl border-primary/40 bg-primary/12 p-4">
       <Typography variant="bodySm" className="text-primary">{text}</Typography>
       <Button className="ml-auto" size="sm" variant="outline" onClick={() => stop.mutate()} disabled={stop.isPending}>
         Выйти из режима
@@ -298,8 +426,9 @@ function WorkspaceHero({
   onLogout: () => void
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-[linear-gradient(135deg,oklch(0.255_0.036_248/0.96),oklch(0.16_0.022_248/0.98)_58%,oklch(0.28_0.04_188/0.55))] p-5 shadow-[0_28px_70px_-48px_black]">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
+    <div className="relative overflow-hidden rounded-2xl border border-primary/24 bg-[linear-gradient(135deg,rgba(41,41,41,0.96),rgba(8,8,8,0.98)_58%,rgba(215,25,32,0.16))] p-5 shadow-[0_28px_80px_-50px_black]">
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 skew-x-[-18deg] bg-[linear-gradient(90deg,transparent,rgba(215,25,32,0.14))]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
       <div className="relative flex flex-wrap items-end gap-4">
         <div className="grid min-w-0 flex-1 gap-3">
           <Badge variant="outline" className="w-fit border-primary/45 bg-primary/12 text-primary">
@@ -310,7 +439,7 @@ function WorkspaceHero({
               {displayName}
             </Typography>
             <Typography variant="bodySm" tone="muted">
-              Панель продаж ROLF Dubai: лиды, менеджеры, метрики и контроль доступа в одном Telegram Mini App.
+              Индустриальная панель продаж ROLF Dubai: лиды, визиты, заказы, метрики и роли в одном Telegram Mini App.
             </Typography>
           </div>
         </div>
@@ -332,6 +461,18 @@ function Dashboard() {
   return (
     <div className="grid gap-4">
       <Card>
+        <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
+          <div className="grid gap-2">
+            <CardTitle>Операционный дашборд</CardTitle>
+            <CardDescription>Сегодняшний срез по клиентским действиям, обороту, визитам и заказам.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className="border-primary/35 bg-primary/12 text-primary">Период: сегодня</Badge>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>Обновить</Button>
+          </div>
+        </CardHeader>
+      </Card>
+      <Card>
         <CardHeader>
           <CardTitle>Как пользоваться ROLF Dubai Sales Suite</CardTitle>
           <CardDescription>
@@ -340,7 +481,7 @@ function Dashboard() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {workspaceGuide.map((section) => (
-            <section key={section.title} className="grid gap-3 rounded-lg border border-border/70 bg-background/35 p-4">
+            <section key={section.title} className="rolf-panel grid gap-3 rounded-2xl p-4">
               <Typography variant="h6">{section.title}</Typography>
               <ul className="grid gap-2">
                 {section.items.map((item) => (
@@ -368,6 +509,7 @@ function Dashboard() {
           <CardDescription>Рабочая лента для менеджера и представителя.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
+          {data.latestOrders.length === 0 && <EmptyState title="Заказов за период пока нет" />}
           {data.latestOrders.map((order) => (
             <Row key={order.id} title={`${order.orderNumber} · ${order.status}`} detail={`${order.clientPoint?.name ?? 'Client'} · AED ${order.total}`} />
           ))}
@@ -379,6 +521,7 @@ function Dashboard() {
           <CardDescription>Плановые точки на сегодня.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
+          {visits.data?.visits.length === 0 && <EmptyState title="Визитов на сегодня нет" />}
           {visits.data?.visits.slice(0, 5).map((visit) => (
             <Row key={visit.id} title={`${visit.clientPoint?.name ?? 'Client'} · ${visit.status}`} detail={new Date(visit.plannedAt).toLocaleString()} />
           ))}
@@ -409,12 +552,16 @@ function Clients({ onCreateOrder }: { onCreateOrder: (clientId: string) => void 
         <CardDescription>Sales rep видит только свои торговые точки.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <input className="h-10 rounded-md border bg-background px-3" placeholder="Поиск по названию, городу, адресу" value={search} onChange={(event) => setSearch(event.target.value)} />
-        {message && <Typography variant="bodySm" className="text-emerald-700">{message}</Typography>}
+        <label className="grid gap-2">
+          <Typography variant="label">Поиск клиентов</Typography>
+          <input className={fieldClass} placeholder="Название, город или адрес" value={search} onChange={(event) => setSearch(event.target.value)} />
+        </label>
+        {message && <Typography variant="bodySm" className="rounded-xl border border-[var(--brand-success)]/30 bg-[rgba(50,168,102,0.12)] p-3 text-[var(--brand-success)]">{message}</Typography>}
         {createVisit.error && <ErrorText error={createVisit.error} />}
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className={listGridClass}>
+          {clients.data?.clients.length === 0 && <EmptyState title="Клиенты не найдены" />}
           {clients.data?.clients.map((client) => (
-            <div key={client.id} className="grid gap-3 rounded-md border p-4">
+            <div key={client.id} className={cn(panelClass, 'grid gap-3')}>
               <Row title={client.name} detail={`${client.type} · ${client.city} · ${client.phone ?? 'no phone'} · ${client.status}`} />
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => createVisit.mutate(client.id)}>
@@ -446,20 +593,27 @@ function Catalog({ canManage }: { canManage: boolean }) {
         <CardDescription>Демо-номенклатура, заменить на реальный прайс клиента.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="flex flex-wrap gap-2">
-          <input className="h-10 min-w-64 rounded-md border bg-background px-3" placeholder="Поиск по SKU или названию" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <select className="h-10 rounded-md border bg-background px-3" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+          <label className="grid gap-2">
+            <Typography variant="label">Поиск товара</Typography>
+            <input className={fieldClass} placeholder="SKU или название" value={search} onChange={(event) => setSearch(event.target.value)} />
+          </label>
+          <label className="grid gap-2">
+            <Typography variant="label">Категория</Typography>
+            <select className={fieldClass} value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
             <option value="">Все категории</option>
             {categories.data?.categories.map((category) => (
               <option key={category.id} value={category.id}>{category.name}</option>
             ))}
-          </select>
-          {canManage && <Button variant="outline">Добавить товар</Button>}
+            </select>
+          </label>
+          {canManage && <Button variant="outline" className="self-end">Добавить товар</Button>}
         </div>
         <Typography variant="bodySm" tone="muted">
           Категорий: {categories.data?.categories.length ?? 0}
         </Typography>
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className={listGridClass}>
+          {products.data?.products.length === 0 && <EmptyState title="Товары не найдены" />}
           {products.data?.products.map((product) => (
             <Row key={product.id} title={product.name} detail={`${product.category?.name ?? 'Category'} · ${product.isActive ? 'active' : 'inactive'} · ${product.viscosity ?? 'n/a'} · ${product.volume} · ${product.sku} · AED ${product.basePrice}`} />
           ))}
@@ -531,25 +685,28 @@ function Orders({
         <CardDescription>Создание черновика, отправка менеджеру, approve/reject.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="grid gap-3 rounded-md border bg-background p-4">
+        <div className={formPanelClass}>
           <Typography variant="h6">Создать заказ</Typography>
-          <select className="h-10 rounded-md border bg-background px-3" value={selectedClientId} onChange={(event) => onSelectedClientIdChange(event.target.value)}>
-            <option value="">Выберите клиента</option>
-            {clients.data?.clients.map((client) => (
-              <option key={client.id} value={client.id}>{client.name}</option>
-            ))}
-          </select>
+          <label className="grid gap-2">
+            <Typography variant="label">Клиент</Typography>
+            <select className={fieldClass} value={selectedClientId} onChange={(event) => onSelectedClientIdChange(event.target.value)}>
+              <option value="">Выберите клиента</option>
+              {clients.data?.clients.map((client) => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          </label>
           <div className="grid gap-2">
             {orderItems.map((item, index) => (
               <div key={index} className="grid gap-2 md:grid-cols-[1fr_100px_120px_auto]">
-                <select className="h-10 rounded-md border bg-background px-3" value={item.productId} onChange={(event) => updateOrderItem(index, { productId: event.target.value }, setOrderItems)}>
+                <select className={fieldClass} aria-label="Товар" value={item.productId} onChange={(event) => updateOrderItem(index, { productId: event.target.value }, setOrderItems)}>
                   <option value="">Товар</option>
                   {products.data?.products.map((product) => (
                     <option key={product.id} value={product.id}>{product.name} · AED {product.basePrice}</option>
                   ))}
                 </select>
-                <input className="h-10 rounded-md border bg-background px-3" type="number" min="1" value={item.quantity} onChange={(event) => updateOrderItem(index, { quantity: Number(event.target.value) }, setOrderItems)} />
-                <input className="h-10 rounded-md border bg-background px-3" type="number" min="0" value={item.discount} onChange={(event) => updateOrderItem(index, { discount: Number(event.target.value) }, setOrderItems)} />
+                <input className={fieldClass} aria-label="Количество" type="number" min="1" value={item.quantity} onChange={(event) => updateOrderItem(index, { quantity: Number(event.target.value) }, setOrderItems)} />
+                <input className={fieldClass} aria-label="Скидка" type="number" min="0" value={item.discount} onChange={(event) => updateOrderItem(index, { discount: Number(event.target.value) }, setOrderItems)} />
                 <Button variant="outline" disabled={orderItems.length === 1} onClick={() => setOrderItems((items) => items.filter((_, itemIndex) => itemIndex !== index))}>Убрать</Button>
               </div>
             ))}
@@ -558,13 +715,19 @@ function Orders({
             </Button>
           </div>
           <div className="grid gap-2 md:grid-cols-[1fr_160px]">
-            <input className="h-10 rounded-md border bg-background px-3" placeholder="Комментарий" value={comment} onChange={(event) => setComment(event.target.value)} />
-            <input className="h-10 rounded-md border bg-background px-3" type="number" min="0" placeholder="Скидка заказа" value={orderDiscount} onChange={(event) => setOrderDiscount(Number(event.target.value))} />
+            <label className="grid gap-2">
+              <Typography variant="label">Комментарий</Typography>
+              <input className={fieldClass} placeholder="Комментарий к заказу" value={comment} onChange={(event) => setComment(event.target.value)} />
+            </label>
+            <label className="grid gap-2">
+              <Typography variant="label">Скидка заказа, AED</Typography>
+              <input className={fieldClass} type="number" min="0" placeholder="0" value={orderDiscount} onChange={(event) => setOrderDiscount(Number(event.target.value))} />
+            </label>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Typography as="span" variant="bodySm">Subtotal: AED {totals.subtotal}</Typography>
-            <Typography as="span" variant="bodySm">Discount: AED {totals.discount}</Typography>
-            <Typography as="strong" variant="emphasis">Total: AED {totals.total}</Typography>
+          <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-background/45 p-3">
+            <Typography as="span" variant="bodySm" className="tabular-nums">Subtotal: AED {totals.subtotal}</Typography>
+            <Typography as="span" variant="bodySm" className="tabular-nums">Discount: AED {totals.discount}</Typography>
+            <Typography as="strong" variant="emphasis" className="text-[var(--brand-gold)] tabular-nums">Total: AED {totals.total}</Typography>
           </div>
           {createOrder.error && <ErrorText error={createOrder.error} />}
           <Button className="w-fit" onClick={() => createOrder.mutate()} disabled={createOrder.isPending}>
@@ -572,7 +735,7 @@ function Orders({
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
-          <select className="h-10 rounded-md border bg-background px-3" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <select className={cn(fieldClass, 'max-w-xs')} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="">Все статусы</option>
             {['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'IN_DELIVERY', 'COMPLETED', 'CANCELLED'].map((status) => (
               <option key={status} value={status}>{status}</option>
@@ -581,9 +744,14 @@ function Orders({
         </div>
         {action.error && <ErrorText error={action.error} />}
         <div className="grid gap-3">
+          {visibleOrders.length === 0 && <EmptyState title="Заказы не найдены" />}
           {visibleOrders.map((order) => (
-            <div key={order.id} className="grid gap-3 rounded-md border p-4">
-              <Row title={`${order.orderNumber} · ${order.status}`} detail={`${order.clientPoint?.name ?? 'Client'} · AED ${order.total}`} />
+            <div key={order.id} className={cn(panelClass, 'grid gap-3')}>
+              <div className="flex flex-wrap items-center gap-2">
+                <Typography variant="emphasis">{order.orderNumber}</Typography>
+                <StatusBadge status={order.status} />
+              </div>
+              <Typography variant="bodySm" tone="muted" wrap="break">{order.clientPoint?.name ?? 'Client'} · AED {order.total}</Typography>
               <Typography variant="bodySm" tone="muted">
                 Items: {order.items?.map((item) => `${item.product?.sku ?? 'SKU'} x${item.quantity}`).join(', ') || 'no items'}
               </Typography>
@@ -591,7 +759,7 @@ function Orders({
                 {order.status === 'DRAFT' && <Button size="sm" onClick={() => action.mutate({ id: order.id, action: 'submit' })}>Отправить</Button>}
                 {canManage && order.status === 'SUBMITTED' && (
                   <>
-                    <input className="h-9 rounded-md border bg-background px-3" placeholder="Manager comment" value={managerComments[order.id] ?? ''} onChange={(event) => setManagerComments((comments) => ({ ...comments, [order.id]: event.target.value }))} />
+                    <input className={fieldClass} placeholder="Комментарий менеджера" value={managerComments[order.id] ?? ''} onChange={(event) => setManagerComments((comments) => ({ ...comments, [order.id]: event.target.value }))} />
                     <Button size="sm" onClick={() => action.mutate({ id: order.id, action: 'approve' })}>Approve</Button>
                     <Button size="sm" variant="outline" onClick={() => action.mutate({ id: order.id, action: 'reject' })}>Reject</Button>
                   </>
@@ -621,9 +789,15 @@ function Visits() {
         <CardDescription>План, старт, завершение и пропуск визита.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
+        {visits.isLoading && <LoadingCard title="visits" />}
+        {visits.data?.visits.length === 0 && <EmptyState title="Визиты не запланированы" />}
         {visits.data?.visits.map((visit) => (
-          <div key={visit.id} className="grid gap-3 rounded-md border p-4">
-            <Row title={`${visit.clientPoint?.name ?? 'Client'} · ${visit.status}`} detail={new Date(visit.plannedAt).toLocaleString()} />
+          <div key={visit.id} className={cn(panelClass, 'grid gap-3')}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Typography variant="emphasis">{visit.clientPoint?.name ?? 'Client'}</Typography>
+              <StatusBadge status={visit.status} />
+            </div>
+            <Typography variant="bodySm" tone="muted">{new Date(visit.plannedAt).toLocaleString()}</Typography>
             <div className="flex flex-wrap gap-2">
               {visit.status === 'PLANNED' && <Button size="sm" onClick={() => action.mutate({ id: visit.id, action: 'start' })}>Начать</Button>}
               {visit.status === 'IN_PROGRESS' && <Button size="sm" onClick={() => action.mutate({ id: visit.id, action: 'complete' })}>Завершить</Button>}
@@ -659,10 +833,16 @@ function Leads({ canManage }: { canManage: boolean }) {
       </CardHeader>
       <CardContent className="grid gap-4">
         {canManage && (
-          <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_1fr_auto]">
-            <input className="h-10 rounded-md border bg-background px-3" placeholder="Название заявки" value={title} onChange={(event) => setTitle(event.target.value)} />
-            <input className="h-10 rounded-md border bg-background px-3" placeholder="Клиент" value={clientName} onChange={(event) => setClientName(event.target.value)} />
-            <Button disabled={!title || !clientName || createLead.isPending} onClick={() => createLead.mutate()}>Добавить</Button>
+          <div className="rolf-panel grid gap-3 rounded-2xl p-4 sm:grid-cols-[1fr_1fr_auto]">
+            <label className="grid gap-2">
+              <Typography variant="label">Название заявки</Typography>
+              <input className={fieldClass} placeholder="Например: Fleet oil request" value={title} onChange={(event) => setTitle(event.target.value)} />
+            </label>
+            <label className="grid gap-2">
+              <Typography variant="label">Клиент</Typography>
+              <input className={fieldClass} placeholder="Компания или контакт" value={clientName} onChange={(event) => setClientName(event.target.value)} />
+            </label>
+            <Button className="self-end" disabled={!title || !clientName || createLead.isPending} onClick={() => createLead.mutate()}>Добавить</Button>
           </div>
         )}
         {createLead.error && <ErrorText error={createLead.error} />}
@@ -670,7 +850,13 @@ function Leads({ canManage }: { canManage: boolean }) {
           {leads.isLoading && <LoadingCard title="leads" />}
           {leads.data?.leads.length === 0 && <EmptyState title="Заявок пока нет" />}
           {leads.data?.leads.map((lead) => (
-            <Row key={lead.id} title={`${lead.title} · ${lead.status}`} detail={`${lead.clientName} · ${lead.assignedManager?.displayName ?? 'Unassigned'} · AED ${lead.amount}`} />
+            <div key={lead.id} className={cn(panelClass, 'grid gap-2')}>
+              <div className="flex flex-wrap items-center gap-2">
+                <Typography variant="emphasis" wrap="break">{lead.title}</Typography>
+                <StatusBadge status={lead.status} />
+              </div>
+              <Typography variant="bodySm" tone="muted" wrap="break">{lead.clientName} · {lead.assignedManager?.displayName ?? 'Unassigned'} · AED {lead.amount}</Typography>
+            </div>
           ))}
         </div>
       </CardContent>
@@ -701,14 +887,22 @@ function Managers() {
       </CardHeader>
       <CardContent className="grid gap-4">
         {(auth.user?.role === 'OWNER' || auth.user?.role === 'ADMIN') && (
-          <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_160px_auto]">
-            <input className="h-10 rounded-md border bg-background px-3" placeholder="Имя менеджера" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
-            <input className="h-10 rounded-md border bg-background px-3" placeholder="Telegram ID" value={telegramId} onChange={(event) => setTelegramId(event.target.value)} />
-            <Button disabled={!displayName || createManager.isPending} onClick={() => createManager.mutate()}>Пригласить</Button>
+          <div className="rolf-panel grid gap-3 rounded-2xl p-4 sm:grid-cols-[1fr_180px_auto]">
+            <label className="grid gap-2">
+              <Typography variant="label">Имя менеджера</Typography>
+              <input className={fieldClass} placeholder="Имя и фамилия" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+            </label>
+            <label className="grid gap-2">
+              <Typography variant="label">Telegram ID</Typography>
+              <input className={fieldClass} placeholder="100001" value={telegramId} onChange={(event) => setTelegramId(event.target.value)} />
+            </label>
+            <Button className="self-end" disabled={!displayName || createManager.isPending} onClick={() => createManager.mutate()}>Пригласить</Button>
           </div>
         )}
         {createManager.error && <ErrorText error={createManager.error} />}
         <div className="grid gap-3 md:grid-cols-2">
+          {managers.isLoading && <LoadingCard title="managers" />}
+          {managers.data?.managers.length === 0 && <EmptyState title="Менеджеры еще не добавлены" />}
           {managers.data?.managers.map((manager) => (
             <ManagerRow key={manager.id} manager={manager} />
           ))}
@@ -737,8 +931,12 @@ function ManagerRow({ manager }: { manager: ManagerSummary }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'managers'] }),
   })
   return (
-    <div className="grid gap-3 rounded-md border p-4">
-      <Row title={`${manager.displayName ?? manager.email} · ${roleLabel(manager.role)}`} detail={`${statusLabel(manager.status)} · ${manager.managerProfile?.workingStatus ?? 'профиль ожидает заполнения'}`} />
+    <div className={cn(panelClass, 'grid gap-3')}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Typography variant="emphasis" wrap="break">{manager.displayName ?? manager.email}</Typography>
+        <StatusBadge status={manager.status} />
+      </div>
+      <Typography variant="bodySm" tone="muted" wrap="break">{roleLabel(manager.role)} · {manager.managerProfile?.workingStatus ?? 'профиль ожидает заполнения'}</Typography>
       {(auth.user?.role === 'OWNER' || auth.user?.role === 'ADMIN') && (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => status.mutate('ACTIVE')}>Активировать</Button>
@@ -766,9 +964,19 @@ function Metrics() {
   return (
     <div className="grid gap-4">
       <Card>
-        <CardContent className="flex flex-wrap gap-2">
-          <input className="h-10 rounded-md border bg-background px-3" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-          <input className="h-10 rounded-md border bg-background px-3" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+        <CardHeader>
+          <CardTitle>Период аналитики</CardTitle>
+          <CardDescription>Выберите диапазон для рейтинга и операционных KPI.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-[180px_180px]">
+          <label className="grid gap-2">
+            <Typography variant="label">С даты</Typography>
+            <input className={fieldClass} type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+          </label>
+          <label className="grid gap-2">
+            <Typography variant="label">По дату</Typography>
+            <input className={fieldClass} type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+          </label>
         </CardContent>
       </Card>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -787,6 +995,8 @@ function Metrics() {
           <CardDescription>Результаты за выбранный период.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
+          {managers.isLoading && <LoadingCard title="manager rating" />}
+          {managers.data?.managers.length === 0 && <EmptyState title="Нет данных по менеджерам за период" />}
           {managers.data?.managers.map((row) => (
             <Row key={row.manager?.id ?? row.managerId} title={`${row.manager?.displayName ?? 'Manager'} · AED ${row.totalAmount}`} detail={`${row.dealsSuccess} success · ${row.dealsCancelled} cancelled · ${row.conversionRate}%`} />
           ))}
@@ -811,9 +1021,12 @@ function Functions() {
         <CardDescription>Операционные переключатели и быстрые параметры системы.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
+        {functions.isLoading && <LoadingCard title="functions" />}
+        {functions.data?.functions.length === 0 && <EmptyState title="Функции еще не настроены" />}
         {functions.data?.functions.map((setting) => (
-          <div key={setting.key} className="flex flex-wrap items-center gap-3 rounded-md border p-3">
+          <div key={setting.key} className={cn(panelClass, 'flex flex-wrap items-center gap-3')}>
             <Row title={setting.title} detail={`${setting.key} · ${setting.description ?? 'No description'}`} />
+            <StatusBadge status={setting.enabled ? 'ACTIVE' : 'DISABLED'} />
             <Button className="ml-auto" variant="outline" onClick={() => toggle.mutate({ key: setting.key, enabled: !setting.enabled })}>
               {setting.enabled ? 'Отключить' : 'Включить'}
             </Button>
@@ -845,14 +1058,28 @@ function Scripts() {
         <CardDescription>Шаблоны, которые менеджеры используют в Telegram-диалогах.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="grid gap-2 rounded-md border p-3">
-          <input className="h-10 rounded-md border bg-background px-3" placeholder="Название" value={title} onChange={(event) => setTitle(event.target.value)} />
-          <textarea className="min-h-24 rounded-md border bg-background px-3 py-2" placeholder="Текст скрипта" value={body} onChange={(event) => setBody(event.target.value)} />
+        <div className={formPanelClass}>
+          <label className="grid gap-2">
+            <Typography variant="label">Название</Typography>
+            <input className={fieldClass} placeholder="Название скрипта" value={title} onChange={(event) => setTitle(event.target.value)} />
+          </label>
+          <label className="grid gap-2">
+            <Typography variant="label">Текст скрипта</Typography>
+            <textarea className={cn(fieldClass, 'min-h-28 py-3')} placeholder="Текст сообщения для менеджера" value={body} onChange={(event) => setBody(event.target.value)} />
+          </label>
           <Button className="w-fit" disabled={!title || !body || createScript.isPending} onClick={() => createScript.mutate()}>Сохранить скрипт</Button>
         </div>
         <div className="grid gap-3">
+          {scripts.isLoading && <LoadingCard title="scripts" />}
+          {scripts.data?.scripts.length === 0 && <EmptyState title="Скриптов пока нет" />}
           {scripts.data?.scripts.map((script) => (
-            <Row key={script.id} title={`${script.title} · ${script.enabled ? 'enabled' : 'disabled'}`} detail={script.body} />
+            <div key={script.id} className={cn(panelClass, 'grid gap-2')}>
+              <div className="flex flex-wrap items-center gap-2">
+                <Typography variant="emphasis" wrap="break">{script.title}</Typography>
+                <StatusBadge status={script.enabled ? 'ACTIVE' : 'DISABLED'} />
+              </div>
+              <Typography variant="bodySm" tone="muted" wrap="break">{script.body}</Typography>
+            </div>
           ))}
         </div>
       </CardContent>
@@ -872,6 +1099,10 @@ function Settings() {
         <StatusRow label="Роль" value={roleLabel(auth.user?.role ?? 'VIEWER')} />
         <StatusRow label="Статус" value={statusLabel(auth.user?.status ?? 'INVITED')} />
         <StatusRow label="Telegram ID" value={auth.user?.telegramId ?? 'не привязан'} />
+        <div className="flex flex-wrap gap-2">
+          <StatusBadge status={auth.user?.status ?? 'INVITED'} />
+          <Badge variant="outline" className="border-primary/35 bg-primary/12 text-primary">Telegram Mini App ready</Badge>
+        </div>
       </CardContent>
     </Card>
   )
@@ -888,7 +1119,7 @@ function Admin() {
       </CardHeader>
       <CardContent className="grid gap-3">
         <Metric label="Активные торговые представители" value={dashboard.data?.dashboard.activeSalesReps ?? 0} />
-        <Typography tone="muted">CRUD пользователей оставлен на следующий этап, каталог и клиенты уже доступны по роли.</Typography>
+        <Typography tone="muted">Административный обзор подключен к текущему API. Каталог, клиенты, заказы, заявки, функции и скрипты доступны через навигацию по роли.</Typography>
       </CardContent>
     </Card>
   )
@@ -939,11 +1170,11 @@ function TelegramAuthScreen() {
   return (
     <section className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_360px]">
       <Card className="relative overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/20 via-primary to-accent/80" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 skew-x-[-18deg] bg-[linear-gradient(90deg,transparent,rgba(215,25,32,0.14))]" />
         <CardHeader>
           <Badge variant="outline" className="w-fit border-primary/45 bg-primary/12 text-primary">Telegram Mini App</Badge>
-          <CardTitle>ROLF Dubai Sales Suite</CardTitle>
-          <CardDescription>Безопасный вход в премиальную панель продаж через Telegram.</CardDescription>
+          <CardTitle>ROLF Lubricants Dubai</CardTitle>
+          <CardDescription>Безопасный вход в индустриальную панель продаж через Telegram.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <StatusRow label="Telegram WebApp" value={telegramWebApp ? 'обнаружен' : 'не обнаружен'} />
@@ -970,19 +1201,25 @@ function TelegramAuthScreen() {
               <Separator />
               <div className="grid gap-3">
                 <Typography variant="h6">Локальный вход для разработки</Typography>
-                <input
-                  aria-label="Demo email"
-                  className={fieldClass}
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-                <input
-                  aria-label="Demo password"
-                  className={fieldClass}
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                />
+                <label className="grid gap-2">
+                  <Typography variant="label">Email</Typography>
+                  <input
+                    aria-label="Demo email"
+                    className={fieldClass}
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <Typography variant="label">Пароль</Typography>
+                  <input
+                    aria-label="Demo password"
+                    className={fieldClass}
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </label>
                 <Button className="w-fit" disabled={isSubmitting} onClick={() => void submit(() => auth.login({ email, password }))}>
                   Войти как local dev user
                 </Button>
@@ -1043,10 +1280,14 @@ function LoadingState() {
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <Card className="bg-[linear-gradient(145deg,oklch(0.225_0.028_247/0.94),oklch(0.18_0.022_247/0.9))]">
+    <Card className="bg-[linear-gradient(145deg,rgba(41,41,41,0.96),rgba(25,25,25,0.92))]">
       <CardHeader className="gap-3">
-        <CardDescription className="uppercase">{label}</CardDescription>
-        <CardTitle className="text-primary">{value}</CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardDescription className="uppercase">{label}</CardDescription>
+          <span className="size-2 rounded-full bg-primary shadow-[0_0_0_4px_var(--brand-red-soft)]" aria-hidden="true" />
+        </div>
+        <CardTitle className="text-primary tabular-nums">{value}</CardTitle>
+        <Typography variant="bodyXs" tone="muted">Текущий период · оперативные данные</Typography>
       </CardHeader>
     </Card>
   )
@@ -1054,8 +1295,8 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 
 function Row({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className={cn(panelClass, 'grid gap-1')}>
-      <Typography variant="emphasis" wrap="break">{title}</Typography>
+    <div className={cn(panelClass, 'grid gap-2 transition-colors hover:border-border/90 hover:bg-secondary/40')}>
+      <Typography variant="emphasis" wrap="break" className="text-foreground">{title}</Typography>
       <Typography variant="bodySm" tone="muted" wrap="break">{detail}</Typography>
     </div>
   )
@@ -1063,19 +1304,51 @@ function Row({ title, detail }: { title: string; detail: string }) {
 
 function StatusRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className={cn(panelClass, 'grid gap-1')}>
+    <div className={cn(panelClass, 'grid gap-2')}>
       <Typography variant="bodySm" tone="muted">{label}</Typography>
       <Typography variant="emphasis" wrap="break">{value}</Typography>
     </div>
   )
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const label = statusLabel(status)
+  const normalized = status.toLowerCase()
+  const tone = normalized.includes('active') || normalized.includes('success') || normalized.includes('approved') || normalized.includes('completed')
+    ? 'success'
+    : normalized.includes('cancel') || normalized.includes('reject') || normalized.includes('block') || normalized.includes('disabled')
+      ? 'danger'
+      : normalized.includes('vip')
+        ? 'gold'
+        : 'neutral'
+  const className = tone === 'success'
+    ? 'border-[var(--brand-success)]/35 bg-[rgba(50,168,102,0.14)] text-[var(--brand-success)]'
+    : tone === 'danger'
+      ? 'border-destructive/35 bg-destructive/12 text-destructive'
+      : tone === 'gold'
+        ? 'border-[var(--brand-gold)]/45 bg-[var(--brand-gold-soft)] text-[var(--brand-gold)]'
+        : 'border-border bg-input/40 text-muted-foreground'
+
+  return (
+    <Badge variant="outline" className={cn('gap-1.5', className)}>
+      <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+      {label}
+    </Badge>
+  )
+}
+
 function LoadingCard({ title }: { title: string }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-3">
-        <Spinner />
-        <Typography variant="bodySm" tone="muted">Loading {title}...</Typography>
+      <CardContent className="grid gap-4">
+        <div className="flex items-center gap-3">
+          <Spinner />
+          <Typography variant="bodySm" tone="muted">Загружаем {title}...</Typography>
+        </div>
+        <div className="grid gap-2">
+          <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-1/2 animate-pulse rounded bg-muted/70" />
+        </div>
       </CardContent>
     </Card>
   )
@@ -1083,16 +1356,17 @@ function LoadingCard({ title }: { title: string }) {
 
 function EmptyState({ title }: { title: string }) {
   return (
-    <div className="rounded-md border border-dashed p-4">
-      <Typography variant="bodySm" tone="muted">{title}</Typography>
+    <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-card/38 p-5">
+      <Typography variant="h6">{title}</Typography>
+      <Typography variant="bodySm" tone="muted">Данные появятся здесь после первого действия или обновления периода.</Typography>
     </div>
   )
 }
 
 function ErrorText({ error }: { error: unknown }) {
   return (
-    <Typography variant="bodySm" className="text-destructive">
-      {error instanceof Error ? error.message : 'Action failed'}
+    <Typography variant="bodySm" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-destructive">
+      {error instanceof Error ? error.message : 'Действие не выполнено'}
     </Typography>
   )
 }

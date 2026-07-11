@@ -51,7 +51,7 @@ function ButtonGroupText({
     <Typography asChild variant="label">
       <Comp
         className={cn(
-          "flex items-center gap-2 rounded-4xl border bg-muted px-2.5 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
+          "flex items-center gap-2 rounded-[10px] border bg-muted px-2.5 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
           className
         )}
         {...props}

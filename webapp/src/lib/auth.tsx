@@ -32,6 +32,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [],
   )
   const handleAuthExpired = useCallback(() => {
+    window.localStorage.removeItem(cachedMeKey)
     clearAuthenticatedSession(queryClient, setAccessToken)
   }, [queryClient, setAccessToken])
 
@@ -47,7 +48,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let isMounted = true
-    const canBootstrapSession = import.meta.env.DEV || Boolean(window.Telegram?.WebApp)
+    const hasCachedSession = Boolean(window.localStorage.getItem(cachedMeKey))
+    const canBootstrapSession = Boolean(window.Telegram?.WebApp) || hasCachedSession
     if (!canBootstrapSession) {
       setIsBootstrapping(false)
       return () => {
@@ -127,6 +129,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   )
 
   const logout = useCallback(async () => {
+    window.localStorage.removeItem(cachedMeKey)
     await logoutAsync()
   }, [logoutAsync])
 
