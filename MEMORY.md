@@ -714,3 +714,13 @@ CI follow-up:
 * Fixed webapp Telegram auth to allow a 90-second cold-start timeout while keeping ordinary API requests shorter.
 * Replaced the client-facing English backend-unreachable auth error with a Russian message telling the user that Render is waking and to retry after 30-60 seconds if needed.
 * Validation passed: `bun run --cwd webapp typecheck`, `bun run --cwd webapp lint`, `bun run --cwd webapp test`, and `bun run --cwd webapp build`.
+
+## Telegram Bot Interactive Owner Controls - 2026-07-11
+
+* User reported the Telegram bot had no real communication and no owner role-management flow.
+* Root cause: bot inline keyboards existed, but callback handling only processed `confirm:*` and `cancel:*`; menu buttons such as managers/owner/settings/system were effectively silent.
+* Added db-aware callback handlers for main menu sections, manager list, manager detail, role picker, status picker, function settings toggle, owner preview, owner impersonation, owner stop mode, and system status.
+* Added confirmed execution for manager creation from bot commands.
+* Owner can now change an active Mini App session into role preview or user impersonation from bot callbacks/text confirmations; role/status changes still require explicit confirm and OWNER users are protected.
+* Added unit coverage to ensure owner inline menu callbacks answer instead of going silent.
+* Validation passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run test`, and standalone `bun run smoke:backend:docker`.

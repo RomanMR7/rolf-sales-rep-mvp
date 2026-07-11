@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import type { AppEnv } from '../env'
 import type { DbClient } from '../db'
 import { parseBotTextCommand, type ParsedBotAction } from './botCommandParser'
@@ -59,7 +61,7 @@ export async function telegramBotResponseForUpdateWithDb(
 ) {
   const callback = update.callback_query
   if (callback?.data) {
-    return handleCallback(callback, db)
+    return handleCallback(callback, db, env)
   }
 
   const message = update.message
@@ -166,8 +168,26 @@ export async function telegramWebhookReplyForUpdateWithDb(
   }
 }
 
-async function handleCallback(callback: NonNullable<TelegramUpdate['callback_query']>, db: DbClient) {
-  const [action, id] = (callback.data ?? '').split(':')
+async function handleCallback(
+  callback: NonNullable<TelegramUpdate['callback_query']>,
+  db: DbClient,
+  env: Pick<AppEnv, 'TELEGRAM_WEBAPP_URL'>,
+) {
+  const data = callback.data ?? ''
+  const botUser = await botUserFromCallback(callback, db)
+  if (data.startsWith('menu:')) return handleMenuCallback(callback, data, botUser, db, env)
+  if (data.startsWith('managers:')) return handleManagersCallback(callback, data, botUser, db)
+  if (data.startsWith('manager:')) return handleManagerDetailCallback(callback, data, botUser, db)
+  if (data.startsWith('role:')) return handleRoleChoiceCallback(callback, data, botUser, db)
+  if (data.startsWith('setrole:')) return createConfirmedActionFromCallback(callback, data, botUser, db, 'manager_role_change')
+  if (data.startsWith('status:')) return handleStatusChoiceCallback(callback, data, botUser, db)
+  if (data.startsWith('setstatus:')) return createConfirmedActionFromCallback(callback, data, botUser, db, 'manager_status')
+  if (data.startsWith('settings:')) return createConfirmedActionFromCallback(callback, data, botUser, db, 'function_toggle')
+  if (data.startsWith('preview:')) return handleOwnerPreviewCallback(callback, data, botUser, db)
+  if (data.startsWith('impersonate:')) return handleOwnerImpersonateCallback(callback, data, botUser, db)
+  if (data === 'owner:stop') return handleOwnerStopCallback(callback, botUser, db)
+
+  const [action, id] = data.split(':')
   if (!id || !['confirm', 'cancel'].includes(action)) return null
   const pending = await db.botActionConfirmation.findUnique({ where: { id } })
   if (!pending || pending.status !== 'PENDING') {
@@ -200,9 +220,302 @@ async function handleCallback(callback: NonNullable<TelegramUpdate['callback_que
   return { chat_id: callback.message?.chat.id ?? callback.from.id, text: 'Готово. Действие подтверждено и записано в audit log.' }
 }
 
+async function botUserFromCallback(callback: NonNullable<TelegramUpdate['callback_query']>, db: DbClient) {
+  return db.user.findUnique({ where: { telegramId: String(callback.from.id) } })
+}
+
+function callbackChatId(callback: NonNullable<TelegramUpdate['callback_query']>) {
+  return callback.message?.chat.id ?? callback.from.id
+}
+
+function ensureBotAdmin(callback: NonNullable<TelegramUpdate['callback_query']>, user: any) {
+  const role = publicRole(user?.role ?? 'VIEWER')
+  if (!user || !['OWNER', 'ADMIN'].includes(role)) {
+    return { chat_id: callbackChatId(callback), text: 'Недостаточно прав. Управление через бота доступно только владельцу и администратору.' }
+  }
+  return null
+}
+
+function ensureBotOwner(callback: NonNullable<TelegramUpdate['callback_query']>, user: any) {
+  const role = publicRole(user?.role ?? 'VIEWER')
+  if (!user || role !== 'OWNER') {
+    return { chat_id: callbackChatId(callback), text: 'Это действие доступно только владельцу.' }
+  }
+  return null
+}
+
+async function handleMenuCallback(
+  callback: NonNullable<TelegramUpdate['callback_query']>,
+  data: string,
+  user: any,
+  db: DbClient,
+  env: Pick<AppEnv, 'TELEGRAM_WEBAPP_URL'>,
+) {
+  const role = publicRole(user?.role ?? 'VIEWER')
+  const chatId = callbackChatId(callback)
+  const section = data.split(':')[1]
+  if (section === 'metrics') return metricsMenu(chatId, role, db)
+  if (section === 'managers') return managersMenu(chatId, role, db)
+  if (section === 'leads') return leadsMenu(chatId, role, db)
+  if (section === 'settings') return settingsMenu(chatId, role, env.TELEGRAM_WEBAPP_URL)
+  if (section === 'owner') return ownerMenu(chatId, role, env.TELEGRAM_WEBAPP_URL)
+  if (section === 'system') return systemMenu(chatId, role, db)
+  return { chat_id: chatId, text: 'Раздел пока недоступен.' }
+}
+
+async function handleManagersCallback(callback: NonNullable<TelegramUpdate['callback_query']>, data: string, user: any, db: DbClient) {
+  const denied = ensureBotAdmin(callback, user)
+  if (denied) return denied
+  const action = data.split(':')[1]
+  if (action === 'add') {
+    return {
+      chat_id: callbackChatId(callback),
+      text: 'Чтобы добавить менеджера, отправьте:\nдобавь менеджера Имя Фамилия telegram id 123456789',
+    }
+  }
+  return managerPickerMenu(callbackChatId(callback), db)
+}
+
+async function managerPickerMenu(chatId: string | number, db: DbClient) {
+  const users = await db.user.findMany({
+    where: { role: { in: ['ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER', 'SALES_REP'] } },
+    take: 10,
+    orderBy: [{ role: 'asc' }, { displayName: 'asc' }],
+  })
+  return {
+    chat_id: chatId,
+    text: users.length ? 'Выберите пользователя для управления:' : 'Пользователей для управления пока нет.',
+    reply_markup: {
+      inline_keyboard: [
+        ...users.map((user) => ([{
+          text: `${user.displayName ?? user.email} — ${roleLabel(publicRole(user.role))}, ${statusLabel(user.status)}`,
+          callback_data: `manager:${user.id}`,
+        }])),
+        [{ text: 'Назад', callback_data: 'menu:managers' }],
+      ],
+    },
+  }
+}
+
+async function handleManagerDetailCallback(callback: NonNullable<TelegramUpdate['callback_query']>, data: string, user: any, db: DbClient) {
+  const denied = ensureBotAdmin(callback, user)
+  if (denied) return denied
+  const id = data.slice('manager:'.length)
+  const manager = await db.user.findUnique({ where: { id }, include: { managerProfile: true } })
+  if (!manager) return { chat_id: callbackChatId(callback), text: 'Пользователь не найден.' }
+  const role = publicRole(manager.role)
+  const buttons = [
+    [{ text: 'Сменить роль', callback_data: `role:${manager.id}` }, { text: 'Статус', callback_data: `status:${manager.id}` }],
+  ]
+  if (publicRole(user.role) === 'OWNER') buttons.push([{ text: 'Работать как этот пользователь', callback_data: `impersonate:${manager.id}` }])
+  buttons.push([{ text: 'Назад к списку', callback_data: 'managers:list' }])
+  return {
+    chat_id: callbackChatId(callback),
+    text: [
+      `Пользователь: ${manager.displayName ?? manager.email}`,
+      `Роль: ${roleLabel(role)}`,
+      `Статус: ${statusLabel(manager.status)}`,
+      `Telegram ID: ${manager.telegramId ?? 'не привязан'}`,
+      manager.managerProfile?.phone ? `Телефон: ${manager.managerProfile.phone}` : null,
+    ].filter(Boolean).join('\n'),
+    reply_markup: { inline_keyboard: buttons },
+  }
+}
+
+async function handleRoleChoiceCallback(callback: NonNullable<TelegramUpdate['callback_query']>, data: string, user: any, db: DbClient) {
+  const denied = ensureBotAdmin(callback, user)
+  if (denied) return denied
+  const id = data.slice('role:'.length)
+  const manager = await db.user.findUnique({ where: { id } })
+  if (!manager) return { chat_id: callbackChatId(callback), text: 'Пользователь не найден.' }
+  if (manager.role === 'OWNER') return { chat_id: callbackChatId(callback), text: 'Роль владельца через бота менять нельзя.' }
+  const roles = publicRole(user.role) === 'OWNER'
+    ? ['ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER']
+    : ['SUPERVISOR', 'MANAGER', 'VIEWER']
+  return {
+    chat_id: callbackChatId(callback),
+    text: `Выберите новую роль для ${manager.displayName ?? manager.email}:`,
+    reply_markup: {
+      inline_keyboard: [
+        ...roles.map((role) => ([{ text: roleLabel(role), callback_data: `setrole:${manager.id}:${role}` }])),
+        [{ text: 'Назад', callback_data: `manager:${manager.id}` }],
+      ],
+    },
+  }
+}
+
+async function handleStatusChoiceCallback(callback: NonNullable<TelegramUpdate['callback_query']>, data: string, user: any, db: DbClient) {
+  const denied = ensureBotAdmin(callback, user)
+  if (denied) return denied
+  const id = data.slice('status:'.length)
+  const manager = await db.user.findUnique({ where: { id } })
+  if (!manager) return { chat_id: callbackChatId(callback), text: 'Пользователь не найден.' }
+  if (manager.role === 'OWNER') return { chat_id: callbackChatId(callback), text: 'Статус владельца через бота менять нельзя.' }
+  const statuses = ['ACTIVE', 'INVITED', 'BLOCKED', 'DISABLED']
+  return {
+    chat_id: callbackChatId(callback),
+    text: `Выберите статус для ${manager.displayName ?? manager.email}:`,
+    reply_markup: {
+      inline_keyboard: [
+        ...statuses.map((status) => ([{ text: statusLabel(status), callback_data: `setstatus:${manager.id}:${status}` }])),
+        [{ text: 'Назад', callback_data: `manager:${manager.id}` }],
+      ],
+    },
+  }
+}
+
+async function createConfirmedActionFromCallback(
+  callback: NonNullable<TelegramUpdate['callback_query']>,
+  data: string,
+  user: any,
+  db: DbClient,
+  intent: ParsedBotAction['intent'],
+) {
+  const denied = ensureBotAdmin(callback, user)
+  if (denied) return denied
+  const parsed = await parsedActionFromCallback(data, intent, db)
+  if (!parsed) return { chat_id: callbackChatId(callback), text: 'Не удалось разобрать действие.' }
+  const pending = await db.botActionConfirmation.create({
+    data: {
+      telegramChatId: String(callbackChatId(callback)),
+      telegramUserId: String(callback.from.id),
+      actorUserId: user.id,
+      intent: parsed.intent,
+      payloadJson: parsed as any,
+      riskLevel: parsed.riskLevel,
+      idempotencyKey: `${parsed.intent}:${user.id}:${Date.now()}`,
+    },
+  })
+  return {
+    chat_id: callbackChatId(callback),
+    text: confirmationText(parsed),
+    reply_markup: { inline_keyboard: [[
+      { text: 'Подтвердить', callback_data: `confirm:${pending.id}` },
+      { text: 'Отмена', callback_data: `cancel:${pending.id}` },
+    ]] },
+  }
+}
+
+async function parsedActionFromCallback(data: string, intent: ParsedBotAction['intent'], db: DbClient): Promise<ParsedBotAction | null> {
+  const parts = data.split(':')
+  if (intent === 'manager_role_change' && parts.length === 3) {
+    return { intent, entity: 'manager', params: { userId: parts[1], role: parts[2] }, requiresConfirmation: true, riskLevel: 'high' }
+  }
+  if (intent === 'manager_status' && parts.length === 3) {
+    return { intent, entity: 'manager', params: { userId: parts[1], status: parts[2] }, requiresConfirmation: true, riskLevel: 'high' }
+  }
+  if (intent === 'function_toggle' && parts.length === 2) {
+    const existing = await db.functionSetting.findUnique({ where: { key: parts[1] } })
+    return { intent, entity: 'function', params: { key: parts[1], enabled: !existing?.enabled }, requiresConfirmation: true, riskLevel: 'high' }
+  }
+  return null
+}
+
+async function handleOwnerPreviewCallback(callback: NonNullable<TelegramUpdate['callback_query']>, data: string, user: any, db: DbClient) {
+  const denied = ensureBotOwner(callback, user)
+  if (denied) return denied
+  const role = data.split(':')[1]
+  if (!['ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER'].includes(role)) {
+    return { chat_id: callbackChatId(callback), text: 'Эта роль недоступна для preview.' }
+  }
+  const changed = await updateLatestOwnerSession(db, user.id, { ownerMode: 'ROLE_PREVIEW', effectiveRole: role, effectiveUserId: null })
+  await db.activityLog.create({
+    data: {
+      actorUserId: user.id,
+      effectiveUserId: user.id,
+      entityType: 'auth_session',
+      entityId: changed?.id ?? user.id,
+      action: 'owner_preview_role',
+      actionSource: 'telegram_bot',
+      payloadJson: { role },
+    },
+  })
+  return {
+    chat_id: callbackChatId(callback),
+    text: changed
+      ? `Готово. Активная Mini App сессия владельца переключена в режим: ${roleLabel(role)}.`
+      : `Режим ${roleLabel(role)} выбран, но активная Mini App сессия не найдена. Сначала войдите в Mini App через Telegram.`,
+  }
+}
+
+async function handleOwnerImpersonateCallback(callback: NonNullable<TelegramUpdate['callback_query']>, data: string, user: any, db: DbClient) {
+  const denied = ensureBotOwner(callback, user)
+  if (denied) return denied
+  const targetId = data.slice('impersonate:'.length)
+  const target = await db.user.findUnique({ where: { id: targetId } })
+  if (!target || target.role === 'OWNER') return { chat_id: callbackChatId(callback), text: 'Этого пользователя нельзя выбрать для impersonation.' }
+  const changed = await updateLatestOwnerSession(db, user.id, { ownerMode: 'USER_IMPERSONATION', effectiveRole: target.role, effectiveUserId: target.id })
+  await db.activityLog.create({
+    data: {
+      actorUserId: user.id,
+      effectiveUserId: target.id,
+      entityType: 'auth_session',
+      entityId: changed?.id ?? user.id,
+      action: 'owner_impersonation_start',
+      actionSource: 'telegram_bot',
+      payloadJson: { targetUserId: target.id },
+    },
+  })
+  return {
+    chat_id: callbackChatId(callback),
+    text: changed
+      ? `Готово. Активная Mini App сессия владельца теперь работает как ${target.displayName ?? target.email}.`
+      : 'Пользователь выбран, но активная Mini App сессия владельца не найдена. Сначала войдите в Mini App через Telegram.',
+  }
+}
+
+async function handleOwnerStopCallback(callback: NonNullable<TelegramUpdate['callback_query']>, user: any, db: DbClient) {
+  const denied = ensureBotOwner(callback, user)
+  if (denied) return denied
+  const changed = await updateLatestOwnerSession(db, user.id, { ownerMode: null, effectiveRole: null, effectiveUserId: null })
+  await db.activityLog.create({
+    data: {
+      actorUserId: user.id,
+      effectiveUserId: user.id,
+      entityType: 'auth_session',
+      entityId: changed?.id ?? user.id,
+      action: 'owner_impersonation_stop',
+      actionSource: 'telegram_bot',
+      payloadJson: {},
+    },
+  })
+  return { chat_id: callbackChatId(callback), text: changed ? 'Готово. Режим владельца выключен.' : 'Активная Mini App сессия владельца не найдена.' }
+}
+
+async function updateLatestOwnerSession(db: any, ownerId: string, data: { ownerMode: string | null; effectiveRole: string | null; effectiveUserId: string | null }) {
+  const session = await db.authSession.findFirst({
+    where: { userId: ownerId, revokedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!session) return null
+  return db.authSession.update({ where: { id: session.id }, data: data as any })
+}
+
 async function executeConfirmedBotAction(tx: any, pending: { intent: string; payloadJson: unknown; actorUserId: string }) {
   const parsed = pending.payloadJson as ParsedBotAction
   const params = parsed.params ?? {}
+  if (pending.intent === 'manager_create') {
+    const telegramId = String(params.telegramId ?? '').trim()
+    const name = String(params.name ?? '').trim()
+    if (!telegramId || !name) return
+    await tx.user.upsert({
+      where: { telegramId },
+      create: {
+        email: `telegram-${telegramId}@telegram.rolf-sales-rep-mvp.local`,
+        passwordHash: await Bun.password.hash(randomUUID()),
+        displayName: name,
+        telegramId,
+        role: 'MANAGER',
+        status: 'ACTIVE',
+      },
+      update: {
+        displayName: name,
+        role: 'MANAGER',
+        status: 'ACTIVE',
+      },
+    })
+    return
+  }
   if (pending.intent === 'manager_role_change') {
     const user = await findUserForBotAction(tx, params)
     if (!user || user.role === 'OWNER') return
@@ -309,10 +622,23 @@ async function executeConfirmedBotAction(tx: any, pending: { intent: string; pay
         closedAt: new Date(),
       },
     })
+    return
+  }
+  if (pending.intent === 'owner_preview_role') {
+    const role = String(params.role ?? '')
+    if (!['ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER'].includes(role)) return
+    await updateLatestOwnerSession(tx, pending.actorUserId, { ownerMode: 'ROLE_PREVIEW', effectiveRole: role, effectiveUserId: null })
+    return
+  }
+  if (pending.intent === 'owner_impersonate') {
+    const user = await findUserForBotAction(tx, params)
+    if (!user || user.role === 'OWNER') return
+    await updateLatestOwnerSession(tx, pending.actorUserId, { ownerMode: 'USER_IMPERSONATION', effectiveRole: user.role, effectiveUserId: user.id })
   }
 }
 
 async function findUserForBotAction(tx: any, params: Record<string, unknown>) {
+  if (params.userId && isUuid(String(params.userId))) return tx.user.findUnique({ where: { id: String(params.userId) } })
   if (params.telegramId) return tx.user.findUnique({ where: { telegramId: String(params.telegramId) } })
   const name = String(params.name ?? params.managerName ?? '').trim()
   if (!name) return null
@@ -389,6 +715,26 @@ function settingsMenu(chatId: string | number, role: string, webAppUrl?: string 
 function ownerMenu(chatId: string | number, role: string, webAppUrl?: string | null) {
   if (role !== 'OWNER') return { chat_id: chatId, text: 'Команда /owner доступна только владельцу.' }
   return { chat_id: chatId, text: 'Режим владельца:', reply_markup: { inline_keyboard: [[{ text: 'Смотреть как ADMIN', callback_data: 'preview:ADMIN' }, { text: 'Смотреть как MANAGER', callback_data: 'preview:MANAGER' }], [{ text: 'Выйти из режима', callback_data: 'owner:stop' }], ...(webAppUrl ? [[{ text: 'Открыть Owner Command Center', web_app: { url: `${webAppUrl.replace(/\/+$/, '')}/app/owner` } }]] : [])] } }
+}
+
+async function systemMenu(chatId: string | number, role: string, db: DbClient) {
+  if (role !== 'OWNER') return { chat_id: chatId, text: 'Системный статус доступен только владельцу.' }
+  const [activeManagers, openLeads, todayActions] = await Promise.all([
+    db.user.count({ where: { role: { in: ['ADMIN', 'SUPERVISOR', 'MANAGER', 'SALES_REP'] }, status: 'ACTIVE' } }),
+    db.deal.count({ where: { status: { in: ['NEW', 'TAKEN', 'IN_PROGRESS'] } } }),
+    db.activityLog.count({ where: { createdAt: { gte: startOfToday() } } }),
+  ])
+  return {
+    chat_id: chatId,
+    text: `Система ROLF Dubai:\nАктивные сотрудники: ${activeManagers}\nОткрытые заявки: ${openLeads}\nДействий сегодня: ${todayActions}`,
+    reply_markup: { inline_keyboard: [[{ text: 'Менеджеры', callback_data: 'menu:managers' }, { text: 'Метрики', callback_data: 'menu:metrics' }], [{ text: 'Owner', callback_data: 'menu:owner' }]] },
+  }
+}
+
+function startOfToday() {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  return date
 }
 
 function helpText(role: string) {
