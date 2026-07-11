@@ -18,6 +18,12 @@ const appRoute = createRoute({
   component: AppPage,
 })
 
+const appOwnerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/app/owner',
+  component: AppPage,
+})
+
 const appAdminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/app/admin',
@@ -69,6 +75,7 @@ const appSettingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   appRoute,
+  appOwnerRoute,
   appAdminRoute,
   appAdminManagersRoute,
   appAdminManagerDetailRoute,

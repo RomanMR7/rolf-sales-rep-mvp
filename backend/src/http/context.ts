@@ -1,4 +1,9 @@
-import type { UserDto } from '@rolf-sales-rep-mvp/contracts'
+import type {
+  EffectiveSessionDto,
+  NavigationFlagsDto,
+  PermissionsDto,
+  UserDto,
+} from '@rolf-sales-rep-mvp/contracts'
 
 import type { AppEnv } from '../env'
 import type { AuthService } from '../auth/service'
@@ -6,6 +11,16 @@ import type { StorageService } from '../storage/service'
 
 export type AuthenticatedUserContext = UserDto & {
   sessionId: string
+  realUser: UserDto
+  effectiveUser: UserDto
+  realUserId: string
+  effectiveUserId: string
+  realRole: UserDto['role']
+  effectiveRole: UserDto['role']
+  ownerMode: 'ROLE_PREVIEW' | 'USER_IMPERSONATION' | null
+  permissions: PermissionsDto
+  navigation: NavigationFlagsDto
+  effectiveSession: EffectiveSessionDto
 }
 
 export type AppHonoVariables = {
@@ -25,6 +40,5 @@ export type AuthenticatedHonoEnv = {
 }
 
 export function userDtoFromAuthenticatedUser(user: AuthenticatedUserContext): UserDto {
-  const { sessionId: _sessionId, ...dto } = user
-  return dto
+  return user.effectiveUser
 }

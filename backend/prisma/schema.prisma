@@ -36,6 +36,7 @@ model User {
   scriptUpdates     SalesScript[] @relation("SalesScriptUpdater")
   activityActors    ActivityLog[] @relation("ActivityActor")
   activityTargets   ActivityLog[] @relation("ActivityTarget")
+  effectiveSessions AuthSession[] @relation("EffectiveAuthSessions")
   dailyMetrics      ManagerDailyMetric[]
 
   @@index([role], map: "users_role_idx")
@@ -48,6 +49,9 @@ model AuthSession {
   id               String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
   userId           String    @db.Uuid @map("user_id")
   refreshTokenHash String    @unique(map: "auth_sessions_refresh_token_hash_key") @map("refresh_token_hash")
+  ownerMode        OwnerSessionMode? @map("owner_mode")
+  effectiveRole    UserRole? @map("effective_role")
+  effectiveUserId  String?   @db.Uuid @map("effective_user_id")
   expiresAt        DateTime  @map("expires_at")
   revokedAt        DateTime? @map("revoked_at")
   userAgent        String?   @map("user_agent")
@@ -55,10 +59,17 @@ model AuthSession {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade, map: "auth_sessions_user_id_fkey")
+  effectiveUser    User?     @relation("EffectiveAuthSessions", fields: [effectiveUserId], references: [id], map: "auth_sessions_effective_user_id_fkey")
 
   @@index([userId], map: "auth_sessions_user_id_idx")
+  @@index([effectiveUserId], map: "auth_sessions_effective_user_id_idx")
   @@index([expiresAt], map: "auth_sessions_expires_at_idx")
   @@map("auth_sessions")
+}
+
+enum OwnerSessionMode {
+  ROLE_PREVIEW
+  USER_IMPERSONATION
 }
 
 enum UserRole {
@@ -151,16 +162,21 @@ model SalesScript {
 model ActivityLog {
   id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
   actorUserId  String   @db.Uuid @map("actor_user_id")
+  effectiveUserId String? @db.Uuid @map("effective_user_id")
   targetUserId String?  @db.Uuid @map("target_user_id")
   entityType   String   @map("entity_type")
   entityId     String   @map("entity_id")
   action       String
+  actionSource String   @default("mini_app") @map("action_source")
+  idempotencyKey String? @unique @map("idempotency_key")
   payloadJson  Json     @default("{}") @map("payload_json")
   createdAt    DateTime @default(now()) @map("created_at")
   actor        User     @relation("ActivityActor", fields: [actorUserId], references: [id], map: "activity_logs_actor_user_id_fkey")
   target       User?    @relation("ActivityTarget", fields: [targetUserId], references: [id], map: "activity_logs_target_user_id_fkey")
 
   @@index([actorUserId], map: "activity_logs_actor_user_id_idx")
+  @@index([effectiveUserId], map: "activity_logs_effective_user_id_idx")
+  @@index([actionSource], map: "activity_logs_action_source_idx")
   @@index([targetUserId], map: "activity_logs_target_user_id_idx")
   @@index([entityType, entityId], map: "activity_logs_entity_idx")
   @@index([createdAt], map: "activity_logs_created_at_idx")
@@ -179,11 +195,31 @@ model ManagerDailyMetric {
   avgResponseSeconds Int      @default(0) @map("avg_response_seconds")
   messagesCount      Int      @default(0) @map("messages_count")
   conversionRate     Decimal  @default(0) @db.Decimal(5, 2) @map("conversion_rate")
+  source             String   @default("system")
+  note               String?
   manager            User     @relation(fields: [managerId], references: [id], onDelete: Cascade, map: "manager_daily_metrics_manager_id_fkey")
 
   @@unique([managerId, date], map: "manager_daily_metrics_manager_id_date_key")
   @@index([date], map: "manager_daily_metrics_date_idx")
   @@map("manager_daily_metrics")
+}
+
+model BotActionConfirmation {
+  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  telegramChatId String    @map("telegram_chat_id")
+  telegramUserId String    @map("telegram_user_id")
+  actorUserId    String    @db.Uuid @map("actor_user_id")
+  intent         String
+  payloadJson    Json      @map("payload_json")
+  riskLevel      String    @default("medium") @map("risk_level")
+  idempotencyKey String    @unique @map("idempotency_key")
+  status         String    @default("PENDING")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  executedAt     DateTime? @map("executed_at")
+
+  @@index([telegramChatId, status], map: "bot_action_confirmations_chat_status_idx")
+  @@index([actorUserId], map: "bot_action_confirmations_actor_user_id_idx")
+  @@map("bot_action_confirmations")
 }
 
 model ClientPoint {

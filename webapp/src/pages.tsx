@@ -19,7 +19,7 @@ const navLinkClass = cn(
 const panelClass = 'rounded-xl border border-border/70 bg-card/72 p-4 shadow-[0_18px_46px_-36px_black]'
 const fieldClass = 'h-10 rounded-lg border px-3'
 
-type View = 'today' | 'leads' | 'managers' | 'metrics' | 'settings' | 'functions' | 'scripts' | 'clients' | 'catalog' | 'orders' | 'visits' | 'admin'
+type View = 'today' | 'owner' | 'leads' | 'managers' | 'metrics' | 'settings' | 'functions' | 'scripts' | 'clients' | 'catalog' | 'orders' | 'visits' | 'admin'
 
 export function RootLayout() {
   return (
@@ -70,10 +70,11 @@ function Workspace() {
   const canManageTeam = canAdmin || auth.user.role === 'SUPERVISOR'
   const canManage = canAdmin || auth.user.role === 'SUPERVISOR'
   const views: Array<[View, string]> = [
-    ['today', 'Dashboard'],
-    ['leads', 'Leads'],
-    ...(canManageTeam ? [['managers', 'Managers'] as [View, string], ['metrics', 'Metrics'] as [View, string]] : []),
-    ['settings', 'Settings'],
+    ...(auth.session?.realRole === 'OWNER' ? [['owner', 'Владелец'] as [View, string]] : []),
+    ['today', 'Главная'],
+    ['leads', 'Заявки'],
+    ...(canManageTeam ? [['managers', 'Менеджеры'] as [View, string], ['metrics', 'Метрики'] as [View, string]] : []),
+    ['settings', 'Настройки'],
   ]
 
   return (
@@ -83,6 +84,7 @@ function Workspace() {
         role={auth.user.role}
         onLogout={() => void auth.logout()}
       />
+      <OwnerModeBanner />
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/88 px-3 py-2 backdrop-blur-xl sm:hidden">
         <nav className="mx-auto grid max-w-md grid-cols-5 gap-1" aria-label="Mini App">
           {views.slice(0, 5).map(([key, label]) => (
@@ -100,11 +102,12 @@ function Workspace() {
         ))}
         {canAdmin && (
           <>
-            <Button variant={view === 'functions' ? 'default' : 'outline'} onClick={() => setView('functions')}>Functions</Button>
-            <Button variant={view === 'scripts' ? 'default' : 'outline'} onClick={() => setView('scripts')}>Scripts</Button>
+            <Button variant={view === 'functions' ? 'default' : 'outline'} onClick={() => setView('functions')}>Функции</Button>
+            <Button variant={view === 'scripts' ? 'default' : 'outline'} onClick={() => setView('scripts')}>Скрипты</Button>
           </>
         )}
       </div>
+      {view === 'owner' && auth.session?.realRole === 'OWNER' && <OwnerCommandCenter setView={setView} />}
       {view === 'today' && <Dashboard />}
       {view === 'leads' && <Leads canManage={auth.user.role !== 'VIEWER'} />}
       {view === 'managers' && canManageTeam && <Managers />}
@@ -118,6 +121,133 @@ function Workspace() {
       {view === 'visits' && <Visits />}
       {view === 'admin' && canAdmin && <Admin />}
     </section>
+  )
+}
+
+function OwnerModeBanner() {
+  const auth = useAuth()
+  const queryClient = useQueryClient()
+  const stop = useMutation({
+    mutationFn: () => auth.api.ownerStopImpersonation(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['auth'] })
+    },
+  })
+  const session = auth.session
+  if (!session?.isActive) return null
+  const text = session.mode === 'ROLE_PREVIEW'
+    ? `Вы смотрите приложение как ${roleLabel(session.effectiveRole)}. Реальная роль: ${roleLabel(session.realRole)}.`
+    : `Режим владельца: вы работаете как ${session.effectiveUser.displayName ?? session.effectiveUser.email} / ${roleLabel(session.effectiveRole)}.`
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary/12 p-3">
+      <Typography variant="bodySm" className="text-primary">{text}</Typography>
+      <Button className="ml-auto" size="sm" variant="outline" onClick={() => stop.mutate()} disabled={stop.isPending}>
+        Выйти из режима
+      </Button>
+    </div>
+  )
+}
+
+function OwnerCommandCenter({ setView }: { setView: (view: View) => void }) {
+  const auth = useAuth()
+  const queryClient = useQueryClient()
+  const [selectedRole, setSelectedRole] = useState('MANAGER')
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const users = useQuery({ queryKey: ['admin', 'users'], queryFn: () => auth.api.adminUsers() })
+  const metrics = useQuery({ queryKey: ['admin', 'metrics', 'overview'], queryFn: () => auth.api.adminMetricsOverview() })
+  const preview = useMutation({
+    mutationFn: () => auth.api.ownerPreviewRole(selectedRole),
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['auth'] }),
+  })
+  const impersonate = useMutation({
+    mutationFn: () => auth.api.ownerImpersonate(selectedUserId),
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['auth'] }),
+  })
+  const data = metrics.data?.metrics
+  const managerUsers = (users.data?.users ?? []).filter((user) => user.role !== 'OWNER')
+
+  return (
+    <div className="grid gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Командный центр владельца</CardTitle>
+          <CardDescription>Быстрое управление ролями, пользователями, метриками и режимом просмотра.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className={cn(panelClass, 'grid gap-3')}>
+              <Typography variant="h6">Быстро посмотреть как роль</Typography>
+              <select className={fieldClass} value={selectedRole} onChange={(event) => setSelectedRole(event.target.value)}>
+                {['OWNER', 'ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER'].map((role) => (
+                  <option key={role} value={role}>{roleLabel(role)}</option>
+                ))}
+              </select>
+              <Button className="w-fit" onClick={() => preview.mutate()} disabled={preview.isPending}>Включить preview</Button>
+            </div>
+            <div className={cn(panelClass, 'grid gap-3')}>
+              <Typography variant="h6">Работать как пользователь</Typography>
+              <select className={fieldClass} value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>
+                <option value="">Выберите пользователя</option>
+                {managerUsers.map((user) => (
+                  <option key={user.id} value={user.id}>{user.displayName ?? user.email} — {roleLabel(user.role)}</option>
+                ))}
+              </select>
+              <Button className="w-fit" onClick={() => impersonate.mutate()} disabled={!selectedUserId || impersonate.isPending}>Работать как пользователь</Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              ['metrics', 'Открыть метрики'],
+              ['managers', 'Добавить менеджера'],
+              ['leads', 'Создать заявку'],
+              ['functions', 'Изменить функции'],
+              ['scripts', 'Скрипты'],
+              ['settings', 'Настройки'],
+            ].map(([view, label]) => (
+              <Button key={view} variant="outline" onClick={() => setView(view as View)}>{label}</Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Лиды сегодня" value={data?.leadsToday ?? 0} />
+        <Metric label="Успехи" value={data?.successfulDealsToday ?? 0} />
+        <Metric label="Отмены" value={data?.cancelledDealsToday ?? 0} />
+        <Metric label="Сумма" value={`AED ${(data?.totalAmountToday ?? 0).toLocaleString()}`} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Менеджеры</CardTitle>
+            <CardDescription>Активность и быстрый контроль команды.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            <StatusRow label="Активные" value={String(data?.activeManagers ?? 0)} />
+            <StatusRow label="Всего" value={String(data?.totalManagers ?? 0)} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Проблемы</CardTitle>
+            <CardDescription>Что требует внимания владельца.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            <StatusRow label="Заявки без менеджера" value="Проверьте раздел Заявки" />
+            <StatusRow label="Ошибки backend/bot" value="Смотрите журнал действий" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Быстрые параметры</CardTitle>
+            <CardDescription>Feature flags и уведомления.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            <StatusRow label="Автоназначение" value="Вкл/выкл через Функции" />
+            <StatusRow label="Уведомления" value="Владелец / Администратор / Заявки / Метрики" />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }
 
@@ -470,21 +600,21 @@ function Leads({ canManage }: { canManage: boolean }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Leads</CardTitle>
-        <CardDescription>Role-scoped deal pipeline from Telegram and sales activity.</CardDescription>
+        <CardTitle>Заявки</CardTitle>
+        <CardDescription>Воронка заявок с доступом по роли из Telegram и продаж.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {canManage && (
           <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_1fr_auto]">
-            <input className="h-10 rounded-md border bg-background px-3" placeholder="Lead title" value={title} onChange={(event) => setTitle(event.target.value)} />
-            <input className="h-10 rounded-md border bg-background px-3" placeholder="Client name" value={clientName} onChange={(event) => setClientName(event.target.value)} />
-            <Button disabled={!title || !clientName || createLead.isPending} onClick={() => createLead.mutate()}>Add</Button>
+            <input className="h-10 rounded-md border bg-background px-3" placeholder="Название заявки" value={title} onChange={(event) => setTitle(event.target.value)} />
+            <input className="h-10 rounded-md border bg-background px-3" placeholder="Клиент" value={clientName} onChange={(event) => setClientName(event.target.value)} />
+            <Button disabled={!title || !clientName || createLead.isPending} onClick={() => createLead.mutate()}>Добавить</Button>
           </div>
         )}
         {createLead.error && <ErrorText error={createLead.error} />}
         <div className="grid gap-3">
           {leads.isLoading && <LoadingCard title="leads" />}
-          {leads.data?.leads.length === 0 && <EmptyState title="No leads yet" />}
+          {leads.data?.leads.length === 0 && <EmptyState title="Заявок пока нет" />}
           {leads.data?.leads.map((lead) => (
             <Row key={lead.id} title={`${lead.title} · ${lead.status}`} detail={`${lead.clientName} · ${lead.assignedManager?.displayName ?? 'Unassigned'} · AED ${lead.amount}`} />
           ))}
@@ -512,15 +642,15 @@ function Managers() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Managers</CardTitle>
-        <CardDescription>Create, invite, and supervise managers.</CardDescription>
+        <CardTitle>Менеджеры</CardTitle>
+        <CardDescription>Создание, приглашение и контроль менеджеров.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {(auth.user?.role === 'OWNER' || auth.user?.role === 'ADMIN') && (
           <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_160px_auto]">
-            <input className="h-10 rounded-md border bg-background px-3" placeholder="Display name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+            <input className="h-10 rounded-md border bg-background px-3" placeholder="Имя менеджера" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
             <input className="h-10 rounded-md border bg-background px-3" placeholder="Telegram ID" value={telegramId} onChange={(event) => setTelegramId(event.target.value)} />
-            <Button disabled={!displayName || createManager.isPending} onClick={() => createManager.mutate()}>Invite</Button>
+            <Button disabled={!displayName || createManager.isPending} onClick={() => createManager.mutate()}>Пригласить</Button>
           </div>
         )}
         {createManager.error && <ErrorText error={createManager.error} />}
@@ -554,11 +684,11 @@ function ManagerRow({ manager }: { manager: ManagerSummary }) {
   })
   return (
     <div className="grid gap-3 rounded-md border p-4">
-      <Row title={`${manager.displayName ?? manager.email} · ${manager.role}`} detail={`${manager.status} · ${manager.managerProfile?.workingStatus ?? 'profile pending'}`} />
+      <Row title={`${manager.displayName ?? manager.email} · ${roleLabel(manager.role)}`} detail={`${statusLabel(manager.status)} · ${manager.managerProfile?.workingStatus ?? 'профиль ожидает заполнения'}`} />
       {(auth.user?.role === 'OWNER' || auth.user?.role === 'ADMIN') && (
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => status.mutate('ACTIVE')}>Activate</Button>
-          <Button size="sm" variant="outline" onClick={() => status.mutate('DISABLED')}>Disable</Button>
+          <Button size="sm" variant="outline" onClick={() => status.mutate('ACTIVE')}>Активировать</Button>
+          <Button size="sm" variant="outline" onClick={() => status.mutate('DISABLED')}>Отключить</Button>
         </div>
       )}
     </div>
@@ -588,19 +718,19 @@ function Metrics() {
         </CardContent>
       </Card>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Total managers" value={data?.totalManagers ?? 0} />
-        <Metric label="Active managers" value={data?.activeManagers ?? 0} />
-        <Metric label="Leads today" value={data?.leadsToday ?? 0} />
-        <Metric label="Success deals" value={data?.successfulDealsToday ?? 0} />
-        <Metric label="Cancelled" value={data?.cancelledDealsToday ?? 0} />
-        <Metric label="Amount" value={`AED ${(data?.totalAmountToday ?? 0).toLocaleString()}`} />
-        <Metric label="Conversion" value={`${data?.conversionRate ?? 0}%`} />
-        <Metric label="Avg response" value={`${data?.averageResponseSeconds ?? 0}s`} />
+        <Metric label="Всего менеджеров" value={data?.totalManagers ?? 0} />
+        <Metric label="Активные менеджеры" value={data?.activeManagers ?? 0} />
+        <Metric label="Лиды сегодня" value={data?.leadsToday ?? 0} />
+        <Metric label="Успешные сделки" value={data?.successfulDealsToday ?? 0} />
+        <Metric label="Отмены" value={data?.cancelledDealsToday ?? 0} />
+        <Metric label="Сумма" value={`AED ${(data?.totalAmountToday ?? 0).toLocaleString()}`} />
+        <Metric label="Конверсия" value={`${data?.conversionRate ?? 0}%`} />
+        <Metric label="Средний ответ" value={`${data?.averageResponseSeconds ?? 0} с`} />
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Leaderboard</CardTitle>
-          <CardDescription>Manager performance for the selected period.</CardDescription>
+          <CardTitle>Рейтинг менеджеров</CardTitle>
+          <CardDescription>Результаты за выбранный период.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
           {managers.data?.managers.map((row) => (
@@ -623,15 +753,15 @@ function Functions() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Functions</CardTitle>
-        <CardDescription>Editable operational toggles and JSON-backed settings.</CardDescription>
+        <CardTitle>Функции</CardTitle>
+        <CardDescription>Операционные переключатели и быстрые параметры системы.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
         {functions.data?.functions.map((setting) => (
           <div key={setting.key} className="flex flex-wrap items-center gap-3 rounded-md border p-3">
             <Row title={setting.title} detail={`${setting.key} · ${setting.description ?? 'No description'}`} />
             <Button className="ml-auto" variant="outline" onClick={() => toggle.mutate({ key: setting.key, enabled: !setting.enabled })}>
-              {setting.enabled ? 'Disable' : 'Enable'}
+              {setting.enabled ? 'Отключить' : 'Включить'}
             </Button>
           </div>
         ))}
@@ -657,14 +787,14 @@ function Scripts() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sales Scripts</CardTitle>
-        <CardDescription>Templates managers can use in Telegram lead conversations.</CardDescription>
+        <CardTitle>Скрипты продаж</CardTitle>
+        <CardDescription>Шаблоны, которые менеджеры используют в Telegram-диалогах.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid gap-2 rounded-md border p-3">
-          <input className="h-10 rounded-md border bg-background px-3" placeholder="Title" value={title} onChange={(event) => setTitle(event.target.value)} />
-          <textarea className="min-h-24 rounded-md border bg-background px-3 py-2" placeholder="Script body" value={body} onChange={(event) => setBody(event.target.value)} />
-          <Button className="w-fit" disabled={!title || !body || createScript.isPending} onClick={() => createScript.mutate()}>Save script</Button>
+          <input className="h-10 rounded-md border bg-background px-3" placeholder="Название" value={title} onChange={(event) => setTitle(event.target.value)} />
+          <textarea className="min-h-24 rounded-md border bg-background px-3 py-2" placeholder="Текст скрипта" value={body} onChange={(event) => setBody(event.target.value)} />
+          <Button className="w-fit" disabled={!title || !body || createScript.isPending} onClick={() => createScript.mutate()}>Сохранить скрипт</Button>
         </div>
         <div className="grid gap-3">
           {scripts.data?.scripts.map((script) => (
@@ -681,13 +811,13 @@ function Settings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Settings</CardTitle>
-        <CardDescription>User and Mini App runtime details.</CardDescription>
+        <CardTitle>Настройки</CardTitle>
+        <CardDescription>Пользователь, роль и параметры Mini App.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
-        <StatusRow label="Role" value={auth.user?.role ?? 'unknown'} />
-        <StatusRow label="Status" value={auth.user?.status ?? 'unknown'} />
-        <StatusRow label="Telegram ID" value={auth.user?.telegramId ?? 'not linked'} />
+        <StatusRow label="Роль" value={roleLabel(auth.user?.role ?? 'VIEWER')} />
+        <StatusRow label="Статус" value={statusLabel(auth.user?.status ?? 'INVITED')} />
+        <StatusRow label="Telegram ID" value={auth.user?.telegramId ?? 'не привязан'} />
       </CardContent>
     </Card>
   )
@@ -762,9 +892,9 @@ function TelegramAuthScreen() {
           <CardDescription>Безопасный вход в премиальную панель продаж через Telegram.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <StatusRow label="Telegram WebApp" value={telegramWebApp ? 'detected' : 'not detected'} />
-          <StatusRow label="initData" value={initData ? 'present' : 'missing'} />
-          <StatusRow label="Telegram user" value={displayUser ?? 'not available'} />
+          <StatusRow label="Telegram WebApp" value={telegramWebApp ? 'обнаружен' : 'не обнаружен'} />
+          <StatusRow label="initData" value={initData ? 'получены' : 'нет данных'} />
+          <StatusRow label="Пользователь Telegram" value={displayUser ?? 'недоступен'} />
           <Separator />
           <div className="flex flex-wrap gap-3">
             <Button disabled={!initData || isSubmitting} onClick={() => void submit(() => auth.telegramAuth({ initData }))}>
@@ -785,7 +915,7 @@ function TelegramAuthScreen() {
             <>
               <Separator />
               <div className="grid gap-3">
-                <Typography variant="h6">Local dev login</Typography>
+                <Typography variant="h6">Локальный вход для разработки</Typography>
                 <input
                   aria-label="Demo email"
                   className={fieldClass}
@@ -811,8 +941,8 @@ function TelegramAuthScreen() {
       {isDev && (
         <Card>
           <CardHeader>
-            <CardTitle>Local users</CardTitle>
-            <CardDescription>Visible only in Vite development mode.</CardDescription>
+          <CardTitle>Локальные пользователи</CardTitle>
+          <CardDescription>Видно только в режиме разработки Vite.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2">
             {['rep1@rolf-demo.local', 'manager@rolf-demo.local', 'admin@rolf-demo.local'].map((demoEmail) => (
@@ -831,10 +961,17 @@ function TelegramAuthScreen() {
 function LoadingState() {
   return (
     <section className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
-      <Card className="w-fit">
-        <CardContent className="flex items-center gap-3">
+      <Card className="max-w-md">
+        <CardHeader>
+          <CardTitle>Открываем кабинет...</CardTitle>
+          <CardDescription>Проверяем Telegram и загружаем права доступа.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          <div className="flex items-center gap-3">
           <Spinner />
-          <Typography variant="bodySm" tone="muted">Checking session...</Typography>
+            <Typography variant="bodySm" tone="muted">Загружаем быстрый вход...</Typography>
+          </div>
+          <Button variant="outline" onClick={() => window.location.reload()}>Повторить</Button>
         </CardContent>
       </Card>
     </section>
@@ -900,12 +1037,22 @@ function ErrorText({ error }: { error: unknown }) {
 function roleLabel(role: string) {
   if (role === 'OWNER') return 'Владелец'
   if (role === 'ADMIN') return 'Администратор'
-  if (role === 'SUPERVISOR') return 'Супервизор'
+  if (role === 'SUPERVISOR') return 'Руководитель'
   if (role === 'MANAGER') return 'Менеджер'
-  return 'Наблюдатель'
+  if (role === 'VIEWER') return 'Просмотр'
+  return role
+}
+
+function statusLabel(status: string) {
+  if (status === 'ACTIVE') return 'Активен'
+  if (status === 'BLOCKED') return 'Заблокирован'
+  if (status === 'INVITED') return 'Приглашён'
+  if (status === 'DISABLED') return 'Отключён'
+  return status
 }
 
 function viewFromPath(path: string): View {
+  if (path.includes('/app/owner')) return 'owner'
   if (path.includes('/admin/managers')) return 'managers'
   if (path.includes('/admin/functions')) return 'functions'
   if (path.includes('/admin/scripts')) return 'scripts'

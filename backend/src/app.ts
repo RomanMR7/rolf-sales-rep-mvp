@@ -7,13 +7,13 @@ import type { AppEnv } from './env'
 import { createAdminRoutes, createLeadRoutes } from './admin/routes'
 import { createAuthRoutes } from './auth/routes'
 import { requireAuth } from './auth/middleware'
-import { AuthService } from './auth/service'
+import { AuthService, mePayload } from './auth/service'
 import { createBusinessRoutes } from './business/routes'
 import type { AppHonoEnv } from './http/context'
-import { userDtoFromAuthenticatedUser } from './http/context'
 import { errorResponse, handleError, validationErrorHook } from './http/errors'
+import { createOwnerRoutes } from './owner/routes'
 import { createStorageServiceFromEnv } from './storage/service'
-import { telegramWebhookReplyForUpdate } from './telegram/bot'
+import { telegramWebhookReplyForUpdateWithDb } from './telegram/bot'
 
 type CreateAppOptions = {
   env: AppEnv
@@ -65,19 +65,57 @@ export function createApp({ env, prisma }: CreateAppOptions) {
   app.route('/api/auth', authRoutes)
   app.route('/auth', authRoutes)
   app.get('/me', requireAuth, (c) => {
-    return c.json({ user: userDtoFromAuthenticatedUser(c.var.user) }, 200)
+    return c.json(mePayload(c.var.user), 200)
+  })
+  app.get('/api/app/bootstrap', requireAuth, async (c) => {
+    const user = c.var.user
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const [urgentLeads, activeManagers, metrics] = await Promise.all([
+      prisma.deal.count({ where: { assignedManagerId: null, status: { in: ['NEW', 'TAKEN'] } } }),
+      prisma.user.count({ where: { role: { in: ['MANAGER', 'SUPERVISOR'] }, status: 'ACTIVE' } }),
+      user.permissions.metricsView
+        ? prisma.managerDailyMetric.aggregate({
+            where: { date: { gte: todayStart } },
+            _sum: { leadsNew: true, dealsSuccess: true, dealsCancelled: true, totalAmount: true },
+            _avg: { conversionRate: true },
+          })
+        : Promise.resolve(null),
+    ])
+    return c.json({
+      ...mePayload(user),
+      featureFlags: {
+        owner_notifications_enabled: true,
+        admin_notifications_enabled: true,
+        lead_notifications_enabled: true,
+        metric_alerts_enabled: true,
+      },
+      counters: {
+        urgentLeads,
+        activeManagers,
+      },
+      dashboardSummary: {
+        leadsToday: metrics?._sum.leadsNew ?? 0,
+        dealsSuccessToday: metrics?._sum.dealsSuccess ?? 0,
+        dealsCancelledToday: metrics?._sum.dealsCancelled ?? 0,
+        totalAmountToday: Number(metrics?._sum.totalAmount ?? 0),
+        conversionRate: Number(metrics?._avg.conversionRate ?? 0),
+      },
+    })
   })
   app.get('/telegram/config', (c) => telegramConfig(c.get('env')))
   app.get('/api/telegram/config', (c) => telegramConfig(c.get('env')))
   app.post('/telegram/webhook', async (c) => {
     const update = await c.req.json().catch(() => ({}))
-    return c.json(telegramWebhookReplyForUpdate(update, c.get('env')), 200)
+    return c.json(await telegramWebhookReplyForUpdateWithDb(update, c.get('env'), prisma), 200)
   })
   app.post('/api/telegram/webhook', async (c) => {
     const update = await c.req.json().catch(() => ({}))
-    return c.json(telegramWebhookReplyForUpdate(update, c.get('env')), 200)
+    return c.json(await telegramWebhookReplyForUpdateWithDb(update, c.get('env'), prisma), 200)
   })
   app.route('/api/admin', createAdminRoutes(prisma))
+  app.route('/api/owner', createOwnerRoutes(prisma))
+  app.route('/owner', createOwnerRoutes(prisma))
   app.route('/api/leads', createLeadRoutes(prisma))
   app.route('/leads', createLeadRoutes(prisma))
   app.route('/api', createBusinessRoutes(prisma))

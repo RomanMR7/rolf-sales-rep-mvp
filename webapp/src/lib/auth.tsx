@@ -20,6 +20,8 @@ import {
 import { AuthContext, type AuthContextValue } from './auth-context'
 import { bootstrapAuthSession } from './bootstrap-auth'
 
+const cachedMeKey = 'rolf:last_successful_me'
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient()
   const [accessToken, setAccessTokenState] = useState<string | null>(null)
@@ -81,6 +83,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
     api,
     enabled: !isBootstrapping && Boolean(accessToken),
   })
+  const cachedMe = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      return JSON.parse(window.localStorage.getItem(cachedMeKey) ?? 'null')
+    } catch {
+      return null
+    }
+  }, [])
+  useEffect(() => {
+    window.Telegram?.WebApp?.ready?.()
+    window.Telegram?.WebApp?.expand?.()
+  }, [])
+  useEffect(() => {
+    if (meQuery.data?.user) {
+      window.localStorage.setItem(cachedMeKey, JSON.stringify(meQuery.data))
+    }
+  }, [meQuery.data])
   const { mutateAsync: registerAsync } = useRegisterMutation({ api, setAccessToken })
   const { mutateAsync: loginAsync } = useLoginMutation({ api, setAccessToken })
   const { mutateAsync: telegramAuthAsync } = useTelegramAuthMutation({ api, setAccessToken })
@@ -113,7 +132,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      user: meQuery.data?.user ?? null,
+      user: meQuery.data?.user ?? cachedMe?.user ?? null,
+      session: meQuery.data?.effectiveSession ?? cachedMe?.effectiveSession ?? null,
+      permissions: meQuery.data?.permissions ?? cachedMe?.permissions ?? null,
+      navigation: meQuery.data?.navigation ?? cachedMe?.navigation ?? null,
       isBootstrapping,
       isAuthenticated: Boolean(meQuery.data?.user),
       register,
@@ -122,7 +144,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       logout,
       api,
     }),
-    [api, isBootstrapping, login, logout, meQuery.data?.user, register, telegramAuth],
+    [api, cachedMe, isBootstrapping, login, logout, meQuery.data, register, telegramAuth],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

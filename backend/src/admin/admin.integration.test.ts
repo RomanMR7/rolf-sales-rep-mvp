@@ -116,6 +116,63 @@ maybeDescribe('admin API integration', () => {
     expect(response.status).toBe(403)
   })
 
+  test('owner can preview role and impersonate without losing real owner access', async () => {
+    const ownerToken = await registerAndPromoteOwner('owner-preview@example.com')
+    const managerToken = await register('manager-preview@example.com')
+    const manager = await prisma.user.update({
+      where: { email: 'manager-preview@example.com' },
+      data: { role: 'MANAGER', status: 'ACTIVE', displayName: 'Preview Manager' },
+    })
+
+    const preview = await app.request('/api/owner/preview-role', {
+      method: 'POST',
+      headers: jsonAuth(ownerToken),
+      body: JSON.stringify({ role: 'MANAGER' }),
+    })
+    expect(preview.status).toBe(200)
+
+    const previewMe = await app.request('/api/auth/me', {
+      headers: { Authorization: `Bearer ${ownerToken}` },
+    })
+    const previewBody = await previewMe.json()
+    expect(previewBody.user.role).toBe('MANAGER')
+    expect(previewBody.effectiveSession.realRole).toBe('OWNER')
+    expect(previewBody.effectiveSession.mode).toBe('ROLE_PREVIEW')
+
+    const hiddenAdmin = await app.request('/api/admin/users', {
+      headers: { Authorization: `Bearer ${ownerToken}` },
+    })
+    expect(hiddenAdmin.status).toBe(403)
+
+    const stop = await app.request('/api/owner/impersonation/stop', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${ownerToken}` },
+    })
+    expect(stop.status).toBe(200)
+
+    const impersonate = await app.request('/api/owner/impersonate', {
+      method: 'POST',
+      headers: jsonAuth(ownerToken),
+      body: JSON.stringify({ userId: manager.id }),
+    })
+    expect(impersonate.status).toBe(200)
+
+    const impersonatedMe = await app.request('/api/auth/me', {
+      headers: { Authorization: `Bearer ${ownerToken}` },
+    })
+    const impersonatedBody = await impersonatedMe.json()
+    expect(impersonatedBody.user.id).toBe(manager.id)
+    expect(impersonatedBody.effectiveSession.realRole).toBe('OWNER')
+    expect(impersonatedBody.effectiveSession.mode).toBe('USER_IMPERSONATION')
+
+    const nonOwner = await app.request('/api/owner/preview-role', {
+      method: 'POST',
+      headers: jsonAuth(managerToken),
+      body: JSON.stringify({ role: 'ADMIN' }),
+    })
+    expect(nonOwner.status).toBe(403)
+  })
+
   async function registerAndPromoteOwner(email: string) {
     const accessToken = await register(email)
     await prisma.user.update({

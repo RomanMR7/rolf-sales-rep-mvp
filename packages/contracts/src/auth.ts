@@ -31,6 +31,37 @@ export const userSchema = z.object({
   createdAt: z.string().datetime(),
 })
 
+export const roleSchema = z.enum(['OWNER', 'ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER'])
+
+export const effectiveSessionSchema = z.object({
+  mode: z.enum(['ROLE_PREVIEW', 'USER_IMPERSONATION']).nullable(),
+  realUser: userSchema,
+  effectiveUser: userSchema,
+  realRole: roleSchema,
+  effectiveRole: roleSchema,
+  isActive: z.boolean(),
+})
+
+export const permissionsSchema = z.object({
+  usersManage: z.boolean(),
+  functionsManage: z.boolean(),
+  scriptsManage: z.boolean(),
+  metricsView: z.boolean(),
+  leadsManage: z.boolean(),
+  leadsView: z.boolean(),
+})
+
+export const navigationFlagsSchema = z.object({
+  owner: z.boolean(),
+  dashboard: z.boolean(),
+  leads: z.boolean(),
+  managers: z.boolean(),
+  metrics: z.boolean(),
+  functions: z.boolean(),
+  scripts: z.boolean(),
+  settings: z.boolean(),
+})
+
 export const registerRequestSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
@@ -85,9 +116,15 @@ export const refreshResponseSchema = z.object({
 
 export const meResponseSchema = z.object({
   user: userSchema,
+  permissions: permissionsSchema.optional(),
+  navigation: navigationFlagsSchema.optional(),
+  effectiveSession: effectiveSessionSchema.optional(),
 })
 
 export type UserDto = z.infer<typeof userSchema>
+export type EffectiveSessionDto = z.infer<typeof effectiveSessionSchema>
+export type PermissionsDto = z.infer<typeof permissionsSchema>
+export type NavigationFlagsDto = z.infer<typeof navigationFlagsSchema>
 export type RegisterRequest = z.input<typeof registerRequestSchema>
 export type RegisterPayload = z.output<typeof registerRequestSchema>
 export type LoginRequest = z.infer<typeof loginRequestSchema>

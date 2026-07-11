@@ -15,8 +15,8 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 
 import type { AppEnv } from '../env'
 import type { AppHonoEnv, AuthenticatedHonoEnv } from '../http/context'
-import { userDtoFromAuthenticatedUser } from '../http/context'
 import { AppError, validationErrorHook } from '../http/errors'
+import { mePayload } from './service'
 import { requireAuth } from './middleware'
 import { resolveTelegramDevUser, verifyTelegramInitData } from './telegram'
 
@@ -261,7 +261,7 @@ export function createAuthRoutes() {
 
   protectedRoutes.use('/me', requireAuth)
   protectedRoutes.openapi(meRoute, async (c) => {
-    return c.json({ user: userDtoFromAuthenticatedUser(c.var.user) }, 200)
+    return c.json(mePayload(c.var.user), 200)
   })
   routes.route('/', protectedRoutes)
 

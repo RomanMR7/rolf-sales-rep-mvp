@@ -325,6 +325,46 @@ export class ApiClient {
     return this.request('/api/admin/activity-log', z.object({ logs: z.array(z.any()) }), { auth: true })
   }
 
+  appBootstrap() {
+    return this.request('/api/app/bootstrap', z.any(), { auth: true })
+  }
+
+  ownerEffectiveSession() {
+    return this.request('/api/owner/effective-session', z.object({ effectiveSession: z.any() }), { auth: true })
+  }
+
+  ownerPreviewRole(role: string) {
+    return this.request('/api/owner/preview-role', z.object({ ok: z.boolean() }), {
+      method: 'POST',
+      body: { role },
+      auth: true,
+    })
+  }
+
+  ownerImpersonate(userId: string) {
+    return this.request('/api/owner/impersonate', z.object({ ok: z.boolean() }), {
+      method: 'POST',
+      body: { userId },
+      auth: true,
+    })
+  }
+
+  ownerStopImpersonation() {
+    return this.request('/api/owner/impersonation/stop', z.object({ ok: z.boolean() }), {
+      method: 'POST',
+      body: {},
+      auth: true,
+    })
+  }
+
+  adminManualMetricEntry(input: unknown) {
+    return this.request('/api/admin/metrics/manual-entry', z.object({ metric: z.any() }), {
+      method: 'POST',
+      body: input,
+      auth: true,
+    })
+  }
+
   leads() {
     return this.request('/api/leads', z.object({ leads: z.array(z.any()) }), { auth: true })
   }
@@ -353,10 +393,13 @@ export class ApiClient {
     let response: Response | null = null
 
     for (const baseUrl of checkedUrls) {
+      const controller = new AbortController()
+      const timeout = globalThis.setTimeout(() => controller.abort(), 8000)
       try {
         response = await fetch(`${baseUrl}${path}`, {
           method: options.method ?? 'GET',
           credentials: 'include',
+          signal: controller.signal,
           headers: this.headers(options),
           body: options.body === undefined ? undefined : JSON.stringify(options.body),
         })
@@ -369,6 +412,8 @@ export class ApiClient {
           path,
           error: error instanceof Error ? error.message : String(error),
         })
+      } finally {
+        globalThis.clearTimeout(timeout)
       }
     }
 

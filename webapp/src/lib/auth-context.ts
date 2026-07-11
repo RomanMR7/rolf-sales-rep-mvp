@@ -1,6 +1,7 @@
 import { createContext } from 'react'
 import type {
   LoginRequest,
+  MeResponse,
   RegisterRequest,
   TelegramAuthRequest,
   UserDto,
@@ -9,6 +10,9 @@ import type { ApiClient } from './api'
 
 export type AuthContextValue = {
   user: UserDto | null
+  session: MeResponse['effectiveSession'] | null
+  permissions: MeResponse['permissions'] | null
+  navigation: MeResponse['navigation'] | null
   isBootstrapping: boolean
   isAuthenticated: boolean
   register: (input: RegisterRequest) => Promise<void>

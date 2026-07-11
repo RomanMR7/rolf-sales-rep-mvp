@@ -28,6 +28,8 @@ maybeDescribe('auth API integration', () => {
   const app = createApp({ env, prisma })
 
   beforeEach(async () => {
+    await prisma.botActionConfirmation.deleteMany()
+    await prisma.activityLog.deleteMany()
     await prisma.authSession.deleteMany()
     await prisma.user.deleteMany()
   })
@@ -63,7 +65,15 @@ maybeDescribe('auth API integration', () => {
     })
     expect(me.status).toBe(200)
     const meBody = await me.json()
-    expect(meBody).toEqual({ user: registerBody.user })
+    expect(meBody.user).toEqual(registerBody.user)
+    expect(meBody.permissions).toMatchObject({ metricsView: true })
+    expect(meBody.navigation).toMatchObject({ dashboard: true, settings: true })
+    expect(meBody.effectiveSession).toMatchObject({
+      mode: null,
+      realRole: registerBody.user.role,
+      effectiveRole: registerBody.user.role,
+      isActive: false,
+    })
     expect('sessionId' in meBody.user).toBe(false)
 
     const refresh = await app.request('/api/auth/refresh', {

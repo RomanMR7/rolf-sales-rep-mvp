@@ -25,12 +25,12 @@ describe('Telegram bot webhook helpers', () => {
     expect(reply).toEqual({
       method: 'sendMessage',
       chat_id: 123,
-      text: 'Open the ROLF Sales App Mini App to manage leads, managers, scripts, and metrics.',
+      text: 'Откройте ROLF Dubai Mini App для управления заявками, менеджерами, скриптами и метриками.',
       reply_markup: {
         inline_keyboard: [
           [
             {
-              text: 'Open ROLF Sales App',
+              text: 'Открыть ROLF Dubai',
               web_app: { url: 'https://rolf-sales-rep-mvp-webapp.vercel.app' },
             },
           ],

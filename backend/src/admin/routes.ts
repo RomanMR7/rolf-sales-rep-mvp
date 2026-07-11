@@ -55,6 +55,20 @@ const dealCreateSchema = z.object({
   assignedManagerId: z.string().uuid().nullable().optional(),
 })
 const dealPatchSchema = dealCreateSchema.partial()
+const manualMetricEntrySchema = z.object({
+  managerId: z.string().uuid(),
+  date: z.string().date(),
+  mode: z.enum(['add', 'replace']).default('replace'),
+  leadsNew: z.number().int().nonnegative().optional(),
+  leadsTaken: z.number().int().nonnegative().optional(),
+  dealsSuccess: z.number().int().nonnegative().optional(),
+  dealsCancelled: z.number().int().nonnegative().optional(),
+  totalAmount: z.number().nonnegative().optional(),
+  avgResponseSeconds: z.number().int().nonnegative().optional(),
+  messagesCount: z.number().int().nonnegative().optional(),
+  note: z.string().trim().max(1000).optional(),
+  source: z.enum(['manual_admin_entry', 'manual_bot_entry']).default('manual_admin_entry'),
+})
 
 export function createAdminRoutes(db: DbClient) {
   const routes = new Hono<AuthenticatedHonoEnv>()
@@ -91,7 +105,7 @@ export function createAdminRoutes(db: DbClient) {
         },
         include: { managerProfile: true, supervisor: true },
       })
-      await writeActivity(tx, actor.id, created.id, 'user', created.id, 'manager_creation', input)
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), created.id, 'user', created.id, 'manager_creation', input, auditActionSource(actor))
       return created
     })
     return c.json({ user: userDto(user) }, 201)
@@ -120,7 +134,7 @@ export function createAdminRoutes(db: DbClient) {
           update: input.profile,
         })
       }
-      await writeActivity(tx, actor.id, id, 'user', id, 'manager_update', input)
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), id, 'user', id, 'manager_update', input, auditActionSource(actor))
       return updated
     })
     return c.json({ user: userDto(user) })
@@ -138,7 +152,7 @@ export function createAdminRoutes(db: DbClient) {
     }
     const user = await db.$transaction(async (tx) => {
       const updated = await tx.user.update({ where: { id }, data: { role }, include: { managerProfile: true, supervisor: true } })
-      await writeActivity(tx, actor.id, id, 'user', id, 'role_change', { from: existing.role, to: role })
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), id, 'user', id, 'role_change', { from: existing.role, to: role }, auditActionSource(actor))
       return updated
     })
     return c.json({ user: userDto(user) })
@@ -155,7 +169,7 @@ export function createAdminRoutes(db: DbClient) {
     }
     const user = await db.$transaction(async (tx) => {
       const updated = await tx.user.update({ where: { id }, data: { status }, include: { managerProfile: true, supervisor: true } })
-      await writeActivity(tx, actor.id, id, 'user', id, 'status_change', { from: existing.status, to: status })
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), id, 'user', id, 'status_change', { from: existing.status, to: status }, auditActionSource(actor))
       return updated
     })
     return c.json({ user: userDto(user) })
@@ -169,7 +183,7 @@ export function createAdminRoutes(db: DbClient) {
     if (existing.role === 'OWNER') throw new AppError(403, 'FORBIDDEN', 'Owner cannot be removed')
     const user = await db.$transaction(async (tx) => {
       const updated = await tx.user.update({ where: { id }, data: { status: 'DISABLED' }, include: { managerProfile: true, supervisor: true } })
-      await writeActivity(tx, actor.id, id, 'user', id, 'status_change', { from: existing.status, to: 'DISABLED' })
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), id, 'user', id, 'status_change', { from: existing.status, to: 'DISABLED' }, auditActionSource(actor))
       return updated
     })
     return c.json({ user: userDto(user) })
@@ -199,7 +213,7 @@ export function createAdminRoutes(db: DbClient) {
         create: { userId: id, ...input },
         update: input,
       })
-      await writeActivity(tx, actor.id, id, 'manager_profile', id, 'manager_update', input)
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), id, 'manager_profile', id, 'manager_update', input, auditActionSource(actor))
       return saved
     })
     return c.json({ profile })
@@ -232,7 +246,7 @@ export function createAdminRoutes(db: DbClient) {
         },
         update: { ...input, valueJson: input.valueJson as Prisma.InputJsonValue | undefined, updatedBy: actor.id },
       })
-      await writeActivity(tx, actor.id, null, 'function_setting', key, 'function_update', input)
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), null, 'function_setting', key, 'function_update', input, auditActionSource(actor))
       return saved
     })
     return c.json({ function: functionDto(setting) })
@@ -248,7 +262,7 @@ export function createAdminRoutes(db: DbClient) {
     const input = scriptCreateSchema.parse(await c.req.json())
     const script = await db.$transaction(async (tx) => {
       const saved = await tx.salesScript.create({ data: { ...input, updatedBy: actor.id } })
-      await writeActivity(tx, actor.id, null, 'sales_script', saved.id, 'script_update', input)
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), null, 'sales_script', saved.id, 'script_update', input, auditActionSource(actor))
       return saved
     })
     return c.json({ script: scriptDto(script) }, 201)
@@ -260,7 +274,7 @@ export function createAdminRoutes(db: DbClient) {
     const input = scriptPatchSchema.parse(await c.req.json())
     const script = await db.$transaction(async (tx) => {
       const saved = await tx.salesScript.update({ where: { id }, data: { ...input, updatedBy: actor.id } })
-      await writeActivity(tx, actor.id, null, 'sales_script', id, 'script_update', input)
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), null, 'sales_script', id, 'script_update', input, auditActionSource(actor))
       return saved
     })
     return c.json({ script: scriptDto(script) })
@@ -271,7 +285,7 @@ export function createAdminRoutes(db: DbClient) {
     const id = c.req.param('id')
     const script = await db.$transaction(async (tx) => {
       const saved = await tx.salesScript.update({ where: { id }, data: { enabled: false, updatedBy: actor.id } })
-      await writeActivity(tx, actor.id, null, 'sales_script', id, 'script_update', { enabled: false })
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), null, 'sales_script', id, 'script_update', { enabled: false }, auditActionSource(actor))
       return saved
     })
     return c.json({ script: scriptDto(script) })
@@ -282,6 +296,48 @@ export function createAdminRoutes(db: DbClient) {
   routes.get('/metrics/managers/:id', requirePermission('metrics:view'), async (c) => {
     await getVisibleManager(db, c.req.param('id'), c.var.user)
     return c.json(await metricsForManager(db, c.req.param('id'), dateRangeFromQuery(c.req.query('from'), c.req.query('to'))))
+  })
+  routes.post('/metrics/manual-entry', requirePermission('metrics:view'), async (c) => {
+    const actor = c.var.user
+    const input = manualMetricEntrySchema.parse(await c.req.json())
+    const manager = await db.user.findUnique({ where: { id: input.managerId } })
+    if (!manager) throw new AppError(404, 'NOT_FOUND', 'Manager not found')
+    const date = new Date(`${input.date}T00:00:00.000Z`)
+    const metric = await db.$transaction(async (tx) => {
+      const existing = await tx.managerDailyMetric.findUnique({
+        where: { managerId_date: { managerId: input.managerId, date } },
+      })
+      const data = metricUpdateData(input, existing)
+      const saved = await tx.managerDailyMetric.upsert({
+        where: { managerId_date: { managerId: input.managerId, date } },
+        create: {
+          managerId: input.managerId,
+          date,
+          ...data,
+          source: input.source,
+          note: input.note,
+        },
+        update: {
+          ...data,
+          source: input.source,
+          note: input.note,
+        },
+      })
+      await tx.activityLog.create({
+        data: {
+          actorUserId: actor.realUserId ?? actor.id,
+          effectiveUserId: actor.effectiveUserId ?? actor.id,
+          targetUserId: input.managerId,
+          entityType: 'manager_daily_metric',
+          entityId: saved.id,
+          action: 'manual_metric_entry',
+          actionSource: input.source,
+          payloadJson: input,
+        },
+      })
+      return saved
+    })
+    return c.json({ metric: metricDto(metric) })
   })
 
   routes.get('/activity-log', requireRole(['OWNER', 'ADMIN']), async (c) => {
@@ -340,7 +396,7 @@ export function createLeadRoutes(db: DbClient) {
     await assertCanAccessLead(db, id, actor)
     const deal = await db.$transaction(async (tx) => {
       const saved = await tx.deal.update({ where: { id }, data: { assignedManagerId }, include: { assignedManager: true, creator: true } })
-      await writeActivity(tx, actor.id, assignedManagerId, 'deal', id, 'lead_assignment', { assignedManagerId })
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), assignedManagerId, 'deal', id, 'lead_assignment', { assignedManagerId }, auditActionSource(actor))
       return saved
     })
     return c.json({ lead: dealDto(deal) })
@@ -357,7 +413,7 @@ export function createLeadRoutes(db: DbClient) {
         data: { status, closedAt: status === 'SUCCESS' || status === 'CANCELLED' ? new Date() : null },
         include: { assignedManager: true, creator: true },
       })
-      await writeActivity(tx, actor.id, saved.assignedManagerId, 'deal', id, 'lead_status_change', { status })
+      await writeActivity(tx, auditActorId(actor), auditEffectiveUserId(actor), saved.assignedManagerId, 'deal', id, 'lead_status_change', { status }, auditActionSource(actor))
       return saved
     })
     return c.json({ lead: dealDto(deal) })
@@ -476,14 +532,40 @@ function dateRangeFromQuery(from?: string, to?: string): DateRange {
   return { gte: start, lte: end }
 }
 
-async function writeActivity(tx: any, actorUserId: string, targetUserId: string | null, entityType: string, entityId: string, action: string, payloadJson: unknown) {
+function auditActorId(actor: { id: string; realUserId?: string }) {
+  return actor.realUserId ?? actor.id
+}
+
+function auditEffectiveUserId(actor: { id: string; effectiveUserId?: string }) {
+  return actor.effectiveUserId ?? actor.id
+}
+
+function auditActionSource(actor: { ownerMode?: string | null }) {
+  if (actor.ownerMode === 'ROLE_PREVIEW') return 'owner_preview'
+  if (actor.ownerMode === 'USER_IMPERSONATION') return 'owner_impersonation'
+  return 'mini_app'
+}
+
+async function writeActivity(
+  tx: any,
+  actorUserId: string,
+  effectiveUserId: string,
+  targetUserId: string | null,
+  entityType: string,
+  entityId: string,
+  action: string,
+  payloadJson: unknown,
+  actionSource: string,
+) {
   await tx.activityLog.create({
     data: {
       actorUserId,
+      effectiveUserId,
       targetUserId,
       entityType,
       entityId,
       action,
+      actionSource,
       payloadJson: payloadJson ?? {},
     },
   })
@@ -533,6 +615,30 @@ function dealDto(deal: any) {
     updatedAt: deal.updatedAt.toISOString(),
     closedAt: deal.closedAt?.toISOString() ?? null,
   }
+}
+
+function metricUpdateData(input: z.infer<typeof manualMetricEntrySchema>, existing: any) {
+  const add = input.mode === 'add'
+  const current = existing ?? {}
+  const next = {
+    leadsNew: metricNumber(input.leadsNew, current.leadsNew, add),
+    leadsTaken: metricNumber(input.leadsTaken, current.leadsTaken, add),
+    dealsSuccess: metricNumber(input.dealsSuccess, current.dealsSuccess, add),
+    dealsCancelled: metricNumber(input.dealsCancelled, current.dealsCancelled, add),
+    totalAmount: metricNumber(input.totalAmount, Number(current.totalAmount ?? 0), add),
+    avgResponseSeconds: metricNumber(input.avgResponseSeconds, current.avgResponseSeconds, add),
+    messagesCount: metricNumber(input.messagesCount, current.messagesCount, add),
+  }
+  const totalClosed = next.dealsSuccess + next.dealsCancelled
+  return {
+    ...next,
+    conversionRate: totalClosed > 0 ? Math.round((next.dealsSuccess / totalClosed) * 10000) / 100 : 0,
+  }
+}
+
+function metricNumber(value: number | undefined, current: number | undefined, add: boolean) {
+  if (value === undefined) return current ?? 0
+  return add ? (current ?? 0) + value : value
 }
 
 function metricDto(metric: any) {

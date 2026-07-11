@@ -11,6 +11,7 @@ import { AppError } from '../http/errors'
 import type { AuthenticatedUserContext } from '../http/context'
 import { userDtoFromAuthenticatedUser } from '../http/context'
 import { Prisma, UserRole } from '../generated/prisma/client'
+import { navigationForRole, permissionsForRole, type Role } from './middleware'
 import { signAccessToken, verifyAccessToken } from './access-tokens'
 import { hashPassword, verifyPassword } from './passwords'
 import { createRefreshToken, hashRefreshToken } from './refresh-tokens'
@@ -35,6 +36,14 @@ type UserRecord = {
   supervisorId: string | null
   lastSeenAt: Date | null
   createdAt: Date
+}
+
+type SessionRecord = {
+  id: string
+  ownerMode: 'ROLE_PREVIEW' | 'USER_IMPERSONATION' | null
+  effectiveRole: UserRole | null
+  effectiveUser: UserRecord | null
+  user: UserRecord
 }
 
 export class AuthService {
@@ -157,9 +166,7 @@ export class AuthService {
           gt: now,
         },
       },
-      include: {
-        user: true,
-      },
+      include: { user: true, effectiveUser: true },
     })
 
     if (!currentSession) {
@@ -230,27 +237,20 @@ export class AuthService {
           gt: new Date(),
         },
       },
-      include: {
-        user: true,
-      },
+      include: { user: true, effectiveUser: true },
     })
 
     if (!session) {
       throw new AppError(401, 'UNAUTHORIZED', 'Session is invalid or expired')
     }
 
-    return {
-      ...toUserDto(session.user),
-      sessionId: session.id,
-    }
+    return authenticatedContextFromSession(session)
   }
 
   async getMe(accessToken: string | undefined) {
     const user = await this.authenticateAccessToken(accessToken)
 
-    return {
-      user: userDtoFromAuthenticatedUser(user),
-    }
+    return mePayload(user)
   }
 
   async logout(refreshToken: string | undefined) {
@@ -322,6 +322,15 @@ export function toUserDto(user: UserRecord): UserDto {
   }
 }
 
+export function mePayload(user: AuthenticatedUserContext) {
+  return {
+    user: userDtoFromAuthenticatedUser(user),
+    permissions: user.permissions,
+    navigation: user.navigation,
+    effectiveSession: user.effectiveSession,
+  }
+}
+
 function displayNameFromTelegramProfile(profile: TelegramUserProfile) {
   return [profile.firstName, profile.lastName].filter(Boolean).join(' ') || profile.username || null
 }
@@ -332,4 +341,47 @@ function telegramEmail(telegramId: string) {
 
 function publicRole(role: UserRole) {
   return role === UserRole.SALES_REP ? UserRole.MANAGER : role
+}
+
+function authenticatedContextFromSession(session: SessionRecord): AuthenticatedUserContext {
+  const realUser = toUserDto(session.user)
+  const effectiveUserRecord = session.ownerMode === 'USER_IMPERSONATION' && session.effectiveUser
+    ? session.effectiveUser
+    : session.user
+  const effectiveUserBase = toUserDto(effectiveUserRecord)
+  const effectiveRole = publicRole(
+    session.ownerMode === 'ROLE_PREVIEW' && session.effectiveRole
+      ? session.effectiveRole
+      : effectiveUserRecord.role,
+  ) as Role
+  const effectiveUser = {
+    ...effectiveUserBase,
+    role: effectiveRole,
+  }
+  const realRole = realUser.role as Role
+  const permissions = permissionsForRole(effectiveRole)
+  const navigation = navigationForRole(effectiveRole)
+  const effectiveSession = {
+    mode: session.ownerMode,
+    realUser,
+    effectiveUser,
+    realRole,
+    effectiveRole,
+    isActive: Boolean(session.ownerMode),
+  }
+
+  return {
+    ...effectiveUser,
+    sessionId: session.id,
+    realUser,
+    effectiveUser,
+    realUserId: realUser.id,
+    effectiveUserId: effectiveUser.id,
+    realRole,
+    effectiveRole,
+    ownerMode: session.ownerMode,
+    permissions,
+    navigation,
+    effectiveSession,
+  }
 }

@@ -687,3 +687,16 @@ CI follow-up:
 * Updated webapp theme tokens, buttons, cards, header branding, unauthenticated Telegram fallback, workspace hero, metrics, rows, and status panels.
 * Validation passed: `bun run --cwd webapp typecheck`, `bun run --cwd webapp build`, `bun run --cwd webapp lint`, and `bun run --cwd webapp test`.
 * Browser check via Edge CDP confirmed mobile fallback renders, premium title appears, and mobile viewport has no horizontal overflow.
+
+## Owner Command Center and Telegram Quick Actions - 2026-07-11
+
+* User requested production layer: Owner Command Center, role preview, user impersonation, Telegram bot quick actions, rule-based admin parser, manual metrics entry, faster Mini App bootstrap, Russian UX, safety/audit/idempotency.
+* Added session-backed owner modes in `auth_sessions`: role preview and user impersonation. Backend now exposes real/effective user, role, permissions, navigation flags, and effective session in `/api/auth/me` and `/api/app/bootstrap`.
+* Added owner endpoints: `/api/owner/preview-role`, `/api/owner/impersonate`, `/api/owner/impersonation/stop`, `/api/owner/effective-session`.
+* Added audit log fields for `effective_user_id`, `action_source`, and `idempotency_key`; added bot pending confirmation table.
+* Added rule-based Telegram parser and role-aware bot menus for `/start`, `/help`, `/me`, `/metrics`, `/managers`, `/leads`, `/settings`, `/owner`; dangerous parsed actions create pending confirmation and idempotency key.
+* Confirmed Telegram bot callbacks now execute supported actions exactly once before audit: manager role change, manager status change, function toggle, and manual metric entry; OWNER users are protected from bot role/status changes.
+* Added `/api/admin/metrics/manual-entry` for partial manual metric updates with `manual_admin_entry` / `manual_bot_entry` source and audit log.
+* Added webapp Owner Command Center at `/app/owner`, role preview block, user impersonation block, persistent owner-mode banner, cached `/me` shell, auth request timeout, early Telegram `ready()`/`expand()`, and Russian labels for key owner/admin screens.
+* Security scan found only placeholder token values in docs and no Telegram token pattern in git history.
+* Validation passed: `bun run typecheck`, `bun run test`, `bun run --cwd webapp lint`, `bun run --cwd webapp build`, `bun run smoke:backend:docker`, `bun run test:contracts`, and `bunx prisma validate --schema backend/prisma/schema.prisma --config backend/prisma.config.ts`.
