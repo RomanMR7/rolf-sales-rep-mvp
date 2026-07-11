@@ -21,3 +21,10 @@ test('manager preview does not receive admin-only function/script views', () => 
   expect(pages).toContain("view === 'functions' && canAdmin")
   expect(pages).toContain("view === 'scripts' && canAdmin")
 })
+
+test('dashboard and query screens expose retryable error states instead of endless loaders', () => {
+  expect(pages).toContain('dashboard.isError')
+  expect(pages).toContain('Дашборд не загрузился')
+  expect(pages).toContain('function ErrorState')
+  expect(pages).toContain('onRetry={() => void dashboard.refetch()}')
+})

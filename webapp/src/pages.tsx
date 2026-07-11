@@ -456,7 +456,17 @@ function Dashboard() {
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: () => auth.api.dashboard() })
   const visits = useQuery({ queryKey: ['visits', 'today'], queryFn: () => auth.api.visits(true) })
   const data = dashboard.data?.dashboard
-  if (!data) return <LoadingCard title="Dashboard" />
+  if (dashboard.isPending) return <LoadingCard title="dashboard" />
+  if (dashboard.isError) {
+    return (
+      <ErrorState
+        title="Дашборд не загрузился"
+        error={dashboard.error}
+        onRetry={() => void dashboard.refetch()}
+      />
+    )
+  }
+  if (!data) return <EmptyState title="Нет данных для дашборда" />
 
   return (
     <div className="grid gap-4">
@@ -521,6 +531,13 @@ function Dashboard() {
           <CardDescription>Плановые точки на сегодня.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
+          {visits.isError && (
+            <ErrorState
+              title="Визиты не загрузились"
+              error={visits.error}
+              onRetry={() => void visits.refetch()}
+            />
+          )}
           {visits.data?.visits.length === 0 && <EmptyState title="Визитов на сегодня нет" />}
           {visits.data?.visits.slice(0, 5).map((visit) => (
             <Row key={visit.id} title={`${visit.clientPoint?.name ?? 'Client'} · ${visit.status}`} detail={new Date(visit.plannedAt).toLocaleString()} />
@@ -559,7 +576,15 @@ function Clients({ onCreateOrder }: { onCreateOrder: (clientId: string) => void 
         {message && <Typography variant="bodySm" className="rounded-xl border border-[var(--brand-success)]/30 bg-[rgba(50,168,102,0.12)] p-3 text-[var(--brand-success)]">{message}</Typography>}
         {createVisit.error && <ErrorText error={createVisit.error} />}
         <div className={listGridClass}>
-          {clients.data?.clients.length === 0 && <EmptyState title="Клиенты не найдены" />}
+          {clients.isLoading && <LoadingCard title="clients" />}
+          {clients.isError && (
+            <ErrorState
+              title="Клиенты не загрузились"
+              error={clients.error}
+              onRetry={() => void clients.refetch()}
+            />
+          )}
+          {!clients.isLoading && !clients.isError && clients.data?.clients.length === 0 && <EmptyState title="Клиенты не найдены" />}
           {clients.data?.clients.map((client) => (
             <div key={client.id} className={cn(panelClass, 'grid gap-3')}>
               <Row title={client.name} detail={`${client.type} · ${client.city} · ${client.phone ?? 'no phone'} · ${client.status}`} />
@@ -613,7 +638,18 @@ function Catalog({ canManage }: { canManage: boolean }) {
           Категорий: {categories.data?.categories.length ?? 0}
         </Typography>
         <div className={listGridClass}>
-          {products.data?.products.length === 0 && <EmptyState title="Товары не найдены" />}
+          {(products.isLoading || categories.isLoading) && <LoadingCard title="catalog" />}
+          {(products.isError || categories.isError) && (
+            <ErrorState
+              title="Каталог не загрузился"
+              error={products.error ?? categories.error}
+              onRetry={() => {
+                void products.refetch()
+                void categories.refetch()
+              }}
+            />
+          )}
+          {!products.isLoading && !products.isError && products.data?.products.length === 0 && <EmptyState title="Товары не найдены" />}
           {products.data?.products.map((product) => (
             <Row key={product.id} title={product.name} detail={`${product.category?.name ?? 'Category'} · ${product.isActive ? 'active' : 'inactive'} · ${product.viscosity ?? 'n/a'} · ${product.volume} · ${product.sku} · AED ${product.basePrice}`} />
           ))}
@@ -744,7 +780,19 @@ function Orders({
         </div>
         {action.error && <ErrorText error={action.error} />}
         <div className="grid gap-3">
-          {visibleOrders.length === 0 && <EmptyState title="Заказы не найдены" />}
+          {(orders.isLoading || clients.isLoading || products.isLoading) && <LoadingCard title="orders" />}
+          {(orders.isError || clients.isError || products.isError) && (
+            <ErrorState
+              title="Заказы не загрузились"
+              error={orders.error ?? clients.error ?? products.error}
+              onRetry={() => {
+                void orders.refetch()
+                void clients.refetch()
+                void products.refetch()
+              }}
+            />
+          )}
+          {!orders.isLoading && !orders.isError && visibleOrders.length === 0 && <EmptyState title="Заказы не найдены" />}
           {visibleOrders.map((order) => (
             <div key={order.id} className={cn(panelClass, 'grid gap-3')}>
               <div className="flex flex-wrap items-center gap-2">
@@ -790,7 +838,14 @@ function Visits() {
       </CardHeader>
       <CardContent className="grid gap-3">
         {visits.isLoading && <LoadingCard title="visits" />}
-        {visits.data?.visits.length === 0 && <EmptyState title="Визиты не запланированы" />}
+        {visits.isError && (
+          <ErrorState
+            title="Визиты не загрузились"
+            error={visits.error}
+            onRetry={() => void visits.refetch()}
+          />
+        )}
+        {!visits.isLoading && !visits.isError && visits.data?.visits.length === 0 && <EmptyState title="Визиты не запланированы" />}
         {visits.data?.visits.map((visit) => (
           <div key={visit.id} className={cn(panelClass, 'grid gap-3')}>
             <div className="flex flex-wrap items-center gap-2">
@@ -848,7 +903,14 @@ function Leads({ canManage }: { canManage: boolean }) {
         {createLead.error && <ErrorText error={createLead.error} />}
         <div className="grid gap-3">
           {leads.isLoading && <LoadingCard title="leads" />}
-          {leads.data?.leads.length === 0 && <EmptyState title="Заявок пока нет" />}
+          {leads.isError && (
+            <ErrorState
+              title="Заявки не загрузились"
+              error={leads.error}
+              onRetry={() => void leads.refetch()}
+            />
+          )}
+          {!leads.isLoading && !leads.isError && leads.data?.leads.length === 0 && <EmptyState title="Заявок пока нет" />}
           {leads.data?.leads.map((lead) => (
             <div key={lead.id} className={cn(panelClass, 'grid gap-2')}>
               <div className="flex flex-wrap items-center gap-2">
@@ -902,7 +964,14 @@ function Managers() {
         {createManager.error && <ErrorText error={createManager.error} />}
         <div className="grid gap-3 md:grid-cols-2">
           {managers.isLoading && <LoadingCard title="managers" />}
-          {managers.data?.managers.length === 0 && <EmptyState title="Менеджеры еще не добавлены" />}
+          {managers.isError && (
+            <ErrorState
+              title="Менеджеры не загрузились"
+              error={managers.error}
+              onRetry={() => void managers.refetch()}
+            />
+          )}
+          {!managers.isLoading && !managers.isError && managers.data?.managers.length === 0 && <EmptyState title="Менеджеры еще не добавлены" />}
           {managers.data?.managers.map((manager) => (
             <ManagerRow key={manager.id} manager={manager} />
           ))}
@@ -960,6 +1029,15 @@ function Metrics() {
   const overview = useQuery({ queryKey: ['admin', 'metrics', params], queryFn: () => auth.api.adminMetricsOverview(params) })
   const managers = useQuery({ queryKey: ['admin', 'metrics', 'managers', params], queryFn: () => auth.api.adminMetricsManagers(params) })
   const data = overview.data?.metrics
+  if (overview.isError) {
+    return (
+      <ErrorState
+        title="Метрики не загрузились"
+        error={overview.error}
+        onRetry={() => void overview.refetch()}
+      />
+    )
+  }
 
   return (
     <div className="grid gap-4">
@@ -996,7 +1074,14 @@ function Metrics() {
         </CardHeader>
         <CardContent className="grid gap-3">
           {managers.isLoading && <LoadingCard title="manager rating" />}
-          {managers.data?.managers.length === 0 && <EmptyState title="Нет данных по менеджерам за период" />}
+          {managers.isError && (
+            <ErrorState
+              title="Рейтинг менеджеров не загрузился"
+              error={managers.error}
+              onRetry={() => void managers.refetch()}
+            />
+          )}
+          {!managers.isLoading && !managers.isError && managers.data?.managers.length === 0 && <EmptyState title="Нет данных по менеджерам за период" />}
           {managers.data?.managers.map((row) => (
             <Row key={row.manager?.id ?? row.managerId} title={`${row.manager?.displayName ?? 'Manager'} · AED ${row.totalAmount}`} detail={`${row.dealsSuccess} success · ${row.dealsCancelled} cancelled · ${row.conversionRate}%`} />
           ))}
@@ -1022,7 +1107,14 @@ function Functions() {
       </CardHeader>
       <CardContent className="grid gap-3">
         {functions.isLoading && <LoadingCard title="functions" />}
-        {functions.data?.functions.length === 0 && <EmptyState title="Функции еще не настроены" />}
+        {functions.isError && (
+          <ErrorState
+            title="Функции не загрузились"
+            error={functions.error}
+            onRetry={() => void functions.refetch()}
+          />
+        )}
+        {!functions.isLoading && !functions.isError && functions.data?.functions.length === 0 && <EmptyState title="Функции еще не настроены" />}
         {functions.data?.functions.map((setting) => (
           <div key={setting.key} className={cn(panelClass, 'flex flex-wrap items-center gap-3')}>
             <Row title={setting.title} detail={`${setting.key} · ${setting.description ?? 'No description'}`} />
@@ -1071,7 +1163,14 @@ function Scripts() {
         </div>
         <div className="grid gap-3">
           {scripts.isLoading && <LoadingCard title="scripts" />}
-          {scripts.data?.scripts.length === 0 && <EmptyState title="Скриптов пока нет" />}
+          {scripts.isError && (
+            <ErrorState
+              title="Скрипты не загрузились"
+              error={scripts.error}
+              onRetry={() => void scripts.refetch()}
+            />
+          )}
+          {!scripts.isLoading && !scripts.isError && scripts.data?.scripts.length === 0 && <EmptyState title="Скриптов пока нет" />}
           {scripts.data?.scripts.map((script) => (
             <div key={script.id} className={cn(panelClass, 'grid gap-2')}>
               <div className="flex flex-wrap items-center gap-2">
@@ -1354,6 +1453,32 @@ function LoadingCard({ title }: { title: string }) {
   )
 }
 
+function ErrorState({
+  title,
+  error,
+  onRetry,
+}: {
+  title: string
+  error: unknown
+  onRetry?: () => void
+}) {
+  return (
+    <div className="grid gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-5">
+      <div className="grid gap-1">
+        <Typography variant="h6" className="text-destructive">{title}</Typography>
+        <Typography variant="bodySm" tone="muted" wrap="break">
+          {userSafeErrorMessage(error)}
+        </Typography>
+      </div>
+      {onRetry && (
+        <Button className="w-fit" variant="outline" size="sm" onClick={onRetry}>
+          Повторить
+        </Button>
+      )}
+    </div>
+  )
+}
+
 function EmptyState({ title }: { title: string }) {
   return (
     <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-card/38 p-5">
@@ -1366,9 +1491,20 @@ function EmptyState({ title }: { title: string }) {
 function ErrorText({ error }: { error: unknown }) {
   return (
     <Typography variant="bodySm" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-destructive">
-      {error instanceof Error ? error.message : 'Действие не выполнено'}
+      {userSafeErrorMessage(error)}
     </Typography>
   )
+}
+
+function userSafeErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : ''
+  if (message.includes('401') || message.includes('Unauthorized') || message.includes('UNAUTHORIZED')) {
+    return 'Сессия не подтверждена. Выйдите и войдите снова.'
+  }
+  if (message.includes('Backend is unreachable') || message.includes('Failed to fetch')) {
+    return 'Сервер временно недоступен или просыпается. Подождите несколько секунд и повторите запрос.'
+  }
+  return message || 'Действие не выполнено. Повторите попытку.'
 }
 
 function roleLabel(role: string) {

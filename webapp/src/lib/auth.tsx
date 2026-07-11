@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import type { LoginRequest, RegisterRequest, TelegramAuthRequest } from '@rolf-sales-rep-mvp/contracts'
+import type { LoginRequest, MeResponse, RegisterRequest, TelegramAuthRequest } from '@rolf-sales-rep-mvp/contracts'
 import {
   type PropsWithChildren,
   useCallback,
@@ -26,6 +26,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient()
   const [accessToken, setAccessTokenState] = useState<string | null>(null)
   const [isBootstrapping, setIsBootstrapping] = useState(true)
+  const [cachedMe, setCachedMe] = useState<MeResponse | null>(() => readCachedMe())
 
   const setAccessToken = useCallback(
     (nextAccessToken: string | null) => setAccessTokenState(nextAccessToken),
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   )
   const handleAuthExpired = useCallback(() => {
     window.localStorage.removeItem(cachedMeKey)
+    setCachedMe(null)
     clearAuthenticatedSession(queryClient, setAccessToken)
   }, [queryClient, setAccessToken])
 
@@ -48,8 +50,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let isMounted = true
-    const hasCachedSession = Boolean(window.localStorage.getItem(cachedMeKey))
-    const canBootstrapSession = Boolean(window.Telegram?.WebApp) || hasCachedSession
+    if (accessToken) {
+      setIsBootstrapping(false)
+      return () => {
+        isMounted = false
+      }
+    }
+
+    const canBootstrapSession = Boolean(window.Telegram?.WebApp) || Boolean(cachedMe)
     if (!canBootstrapSession) {
       setIsBootstrapping(false)
       return () => {
@@ -60,6 +68,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const bootstrapApi = new ApiClient({
       getAccessToken: () => null,
       setAccessToken,
+      onAuthExpired: handleAuthExpired,
     })
 
     bootstrapAuthSession({
@@ -79,20 +88,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => {
       isMounted = false
     }
-  }, [setAccessToken])
+  }, [accessToken, cachedMe, handleAuthExpired, setAccessToken])
 
   const meQuery = useCurrentUserQuery({
     api,
     enabled: !isBootstrapping && Boolean(accessToken),
   })
-  const cachedMe = useMemo(() => {
-    if (typeof window === 'undefined') return null
-    try {
-      return JSON.parse(window.localStorage.getItem(cachedMeKey) ?? 'null')
-    } catch {
-      return null
-    }
-  }, [])
   useEffect(() => {
     window.Telegram?.WebApp?.ready?.()
     window.Telegram?.WebApp?.expand?.()
@@ -100,6 +101,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (meQuery.data?.user) {
       window.localStorage.setItem(cachedMeKey, JSON.stringify(meQuery.data))
+      setCachedMe(meQuery.data)
     }
   }, [meQuery.data])
   const { mutateAsync: registerAsync } = useRegisterMutation({ api, setAccessToken })
@@ -130,6 +132,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const logout = useCallback(async () => {
     window.localStorage.removeItem(cachedMeKey)
+    setCachedMe(null)
     await logoutAsync()
   }, [logoutAsync])
 
@@ -151,4 +154,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+function readCachedMe(): MeResponse | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    return JSON.parse(window.localStorage.getItem(cachedMeKey) ?? 'null') as MeResponse | null
+  } catch {
+    window.localStorage.removeItem(cachedMeKey)
+    return null
+  }
 }

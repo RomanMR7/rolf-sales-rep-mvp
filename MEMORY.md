@@ -773,3 +773,15 @@ CI follow-up:
 * Fixed clean browser fallback console noise in `webapp/src/lib/auth.tsx`: bootstrap refresh now runs only in Telegram WebApp or when `cachedMe` exists, and logout/auth-expiry clears `cachedMe`.
 * Final Playwright smoke passed at 1440, 390, and 320 px: auth screen, local login, dashboard, navigation to leads/orders/visits/settings, no horizontal overflow, no console errors, no failed requests, no `ERR_CONNECTION_REFUSED`.
 * Final validation passed again: `bun install`, webapp typecheck/lint/test/build, `bun run test:contracts`, root `bun run typecheck`, root `bun run test`, and root `bun run build`.
+
+## Dashboard Loading Stabilization - 2026-07-11
+
+* User reported the dashboard could load for about 30 minutes and requested a full application stabilization check.
+* Live Render/backend timing checks showed backend dashboard endpoints were responding in seconds or less after wake; local checks were fast: `/health` about 57 ms, login about 432 ms, `/api/auth/me` about 121 ms, `/api/dashboard` about 129 ms, `/api/visits/today` about 49 ms, and `/api/admin/metrics/overview` about 54 ms.
+* Root cause was frontend state handling, not a long dashboard query: cached `rolf:last_successful_me` could keep the app in an authenticated-looking dashboard state after refresh/session expiry, while dashboard and related query screens rendered loading forever when data was missing and errors were not surfaced.
+* Fixed `webapp/src/lib/auth.tsx` so cached user data is real React state, corrupt/stale cache is cleared, auth expiry clears cached user data, bootstrap refresh uses the auth-expiry handler, and non-Telegram/non-cached browser fallback does not pretend to have a session.
+* Fixed `webapp/src/pages.tsx` so dashboard, visits, clients, catalog, orders, leads, managers, metrics, functions, and scripts show explicit retryable Russian error states instead of endless loaders.
+* Added regression coverage in `webapp/tests/auth-queries.test.ts` and `webapp/tests/owner-ui.test.ts` for stale cached auth cleanup and retryable dashboard/query error states.
+* Validation passed: `bun run --cwd webapp typecheck`, `bun run --cwd webapp lint`, `bun run --cwd webapp test`, `bun run --cwd webapp build`, `bun run test:contracts`, `bun run typecheck`, `bun run test`, and `bun run build`.
+* Local browser smoke passed with backend running: clean auth screen has no console errors/failed requests; stale cached session returns to auth, clears cache, and shows no dashboard loader; admin login reaches `Операционный дашборд`; desktop navigation across leads/orders/visits/settings has no console errors, failed requests, 5xx responses, or horizontal overflow; mobile dashboard has no console errors, failed requests, 5xx responses, or horizontal overflow.
+* Expected note: stale cached session recovery intentionally receives one `401` from `/api/auth/refresh` before clearing local cache; this is the controlled recovery path and no longer leaves the dashboard spinning.
