@@ -724,3 +724,4 @@ CI follow-up:
 * Owner can now change an active Mini App session into role preview or user impersonation from bot callbacks/text confirmations; role/status changes still require explicit confirm and OWNER users are protected.
 * Added unit coverage to ensure owner inline menu callbacks answer instead of going silent.
 * Validation passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run test`, and standalone `bun run smoke:backend:docker`.
+* Live Render smoke after commit `529ef44` passed: `menu:system` callback returned system status, manager detail returned inline controls, role picker opened, `setrole:<id>:MANAGER` created a confirmation, `confirm:*` changed the temporary user's role to `MANAGER`, and temporary smoke users were disabled.
