@@ -22,6 +22,30 @@ test('manager preview does not receive admin-only function/script views', () => 
   expect(pages).toContain("view === 'scripts' && canAdmin")
 })
 
+test('manager cards keep role change controls wired to the admin role endpoint', () => {
+  expect(pages).toContain("queryKey: canManageUsers ? ['admin', 'users', 'managed-team'] : ['admin', 'managers']")
+  expect(pages).toContain('updateAdminUserRole(manager.id, roleValue)')
+  expect(pages).toContain('Сменить роль')
+  expect(pages).toContain("const roleOptions = ['ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER']")
+  expect(pages).toContain("queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })")
+})
+
+test('dashboard guide gives step-by-step instructions for every role', () => {
+  for (const title of [
+    'OWNER: владелец',
+    'ADMIN: администратор',
+    'SUPERVISOR: руководитель',
+    'MANAGER: менеджер',
+    'VIEWER: просмотр',
+  ]) {
+    expect(pages).toContain(title)
+  }
+  expect(pages).toContain('Нажмите "Владелец"')
+  expect(pages).toContain('Нажмите "Менеджеры"')
+  expect(pages).toContain('Нажмите "Заявки"')
+  expect(pages).toContain('Кнопки управленческих действий')
+})
+
 test('dashboard and query screens expose retryable error states instead of endless loaders', () => {
   expect(pages).toContain('dashboard.isError')
   expect(pages).toContain('Дашборд не загрузился')

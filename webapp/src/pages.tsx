@@ -43,37 +43,53 @@ const mobilePrimaryViews: View[] = ['today', 'leads', 'orders', 'visits', 'setti
 
 const workspaceGuide = [
   {
-    title: 'Быстрый старт',
+    title: 'OWNER: владелец',
     items: [
-      'Откройте бота в Telegram, нажмите /start и войдите в Mini App через кнопку Workspace.',
-      'На главной странице проверьте текущие заявки, ближайшие действия и свежие изменения команды.',
-      'Если работаете с компьютера, используйте кнопку "Открыть на компьютере" в боте.',
+      'Нажмите "Владелец", выберите роль в блоке "Быстро посмотреть как роль" и нажмите "Включить preview" — приложение должно показать баннер режима.',
+      'Нажмите "Работать как пользователь", выберите сотрудника и нажмите одноименную кнопку — вы увидите интерфейс выбранного сотрудника.',
+      'Нажмите "Менеджеры": можно пригласить сотрудника, выбрать роль в карточке и нажать "Сменить роль"; OWNER может выдать ADMIN, SUPERVISOR, MANAGER или VIEWER.',
+      'Нажмите "Функции" и "Скрипты": можно включать параметры системы и редактировать рабочие тексты.',
+      'Нажмите "Выйти из режима" в баннере, чтобы вернуться к полной роли владельца.',
     ],
   },
   {
-    title: 'Настройка владельцем и админом',
+    title: 'ADMIN: администратор',
     items: [
-      'Откройте "Менеджеры", добавьте сотрудника по Telegram ID и назначьте роль.',
-      'В "Настройках" включайте или отключайте рабочие функции: заявки, скрипты, метрики и доступы.',
-      'В "Владелец" используйте предпросмотр роли или вход от лица сотрудника, чтобы проверить его интерфейс.',
+      'Нажмите "Менеджеры": можно добавить сотрудника, активировать, отключить и сменить роль на ADMIN, SUPERVISOR, MANAGER или VIEWER.',
+      'ADMIN не может назначить OWNER и не может снять роль OWNER — это блокируется backend.',
+      'Нажмите "Заявки": можно создавать заявки и назначать ответственного менеджера.',
+      'Нажмите "Метрики": можно проверять результаты команды и периоды.',
+      'Нажмите "Функции" или "Скрипты": можно управлять настройками и рабочими сценариями.',
     ],
   },
   {
-    title: 'Работа менеджера',
+    title: 'SUPERVISOR: руководитель',
     items: [
-      'Откройте "Заявки", обновляйте статус клиента и фиксируйте следующий шаг.',
-      'Используйте "Скрипты" для единых сообщений клиентам и "Метрики" для контроля результата.',
-      'Все важные действия сохраняются в audit log, чтобы руководитель видел историю изменений.',
+      'Нажмите "Менеджеры": доступен просмотр команды без админского создания и смены ролей.',
+      'Нажмите "Метрики": смотрите показатели команды и периодические результаты.',
+      'Нажмите "Заявки": можно видеть рабочую воронку и помогать с контролем статусов.',
+      'Разделы "Функции", "Скрипты" и "Админ" не должны открываться для SUPERVISOR.',
+      'Если нужно проверить доступ, OWNER может включить preview роли SUPERVISOR в разделе "Владелец".',
     ],
   },
   {
-    title: 'Права доступа',
+    title: 'MANAGER: менеджер',
     items: [
-      'OWNER управляет всеми ролями, настройками, функциями и режимами проверки.',
-      'ADMIN управляет командой и рабочими данными без смены владельца.',
-      'SUPERVISOR смотрит командные показатели и помогает контролировать менеджеров.',
-      'MANAGER работает только со своими клиентами, заявками и показателями.',
-      'VIEWER получает режим просмотра без управленческих действий.',
+      'Нажмите "Заявки": берите клиента в работу, меняйте статус и фиксируйте следующий шаг.',
+      'Нажмите "Клиенты": создавайте визит или быстрый заказ по точке продаж.',
+      'Нажмите "Заказы": оформляйте заказ, добавляйте товары и отправляйте в работу.',
+      'Нажмите "Визиты": начинайте, завершайте или пропускайте запланированные визиты.',
+      'MANAGER не должен видеть "Менеджеры", "Функции", "Скрипты" и "Админ".',
+    ],
+  },
+  {
+    title: 'VIEWER: просмотр',
+    items: [
+      'Нажмите "Главная", "Заявки", "Клиенты", "Каталог", "Заказы" или "Визиты" для просмотра доступных данных.',
+      'Кнопки управленческих действий, создания сотрудников, смены ролей и системных настроек не должны быть доступны.',
+      'Если VIEWER видит лишнюю кнопку управления, проверьте роль через OWNER preview и раздел "Настройки".',
+      'Для возврата прав ADMIN или OWNER меняет роль сотрудника в "Менеджеры" через кнопку "Сменить роль".',
+      'Все критичные изменения ролей и статусов пишутся в audit log.',
     ],
   },
 ]
@@ -929,7 +945,17 @@ function Leads({ canManage }: { canManage: boolean }) {
 function Managers() {
   const auth = useAuth()
   const queryClient = useQueryClient()
-  const managers = useQuery({ queryKey: ['admin', 'managers'], queryFn: () => auth.api.adminManagers() })
+  const canManageUsers = auth.user?.role === 'OWNER' || auth.user?.role === 'ADMIN'
+  const managers = useQuery({
+    queryKey: canManageUsers ? ['admin', 'users', 'managed-team'] : ['admin', 'managers'],
+    queryFn: async () => {
+      if (canManageUsers) {
+        const response = await auth.api.adminUsers()
+        return { managers: response.users.filter((user: ManagerSummary) => user.role !== 'OWNER') }
+      }
+      return auth.api.adminManagers()
+    },
+  })
   const [displayName, setDisplayName] = useState('')
   const [telegramId, setTelegramId] = useState('')
   const createManager = useMutation({
@@ -938,6 +964,7 @@ function Managers() {
       setDisplayName('')
       setTelegramId('')
       await queryClient.invalidateQueries({ queryKey: ['admin', 'managers'] })
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
   })
 
@@ -971,7 +998,7 @@ function Managers() {
               onRetry={() => void managers.refetch()}
             />
           )}
-          {!managers.isLoading && !managers.isError && managers.data?.managers.length === 0 && <EmptyState title="Менеджеры еще не добавлены" />}
+          {!managers.isLoading && !managers.isError && managers.data?.managers.length === 0 && <EmptyState title="Сотрудники еще не добавлены" />}
           {managers.data?.managers.map((manager) => (
             <ManagerRow key={manager.id} manager={manager} />
           ))}
@@ -995,10 +1022,26 @@ type ManagerSummary = {
 function ManagerRow({ manager }: { manager: ManagerSummary }) {
   const auth = useAuth()
   const queryClient = useQueryClient()
+  const [nextRole, setNextRole] = useState(manager.role === 'SALES_REP' ? 'MANAGER' : manager.role)
+  useEffect(() => {
+    setNextRole(manager.role === 'SALES_REP' ? 'MANAGER' : manager.role)
+  }, [manager.role])
   const status = useMutation({
     mutationFn: (nextStatus: string) => auth.api.updateAdminUserStatus(manager.id, nextStatus),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'managers'] }),
   })
+  const role = useMutation({
+    mutationFn: (roleValue: string) => auth.api.updateAdminUserRole(manager.id, roleValue),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin', 'managers'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'activity-log'] }),
+      ])
+    },
+  })
+  const canManageRole = auth.user?.role === 'OWNER' || auth.user?.role === 'ADMIN'
+  const roleOptions = ['ADMIN', 'SUPERVISOR', 'MANAGER', 'VIEWER']
   return (
     <div className={cn(panelClass, 'grid gap-3')}>
       <div className="flex flex-wrap items-center gap-2">
@@ -1006,10 +1049,41 @@ function ManagerRow({ manager }: { manager: ManagerSummary }) {
         <StatusBadge status={manager.status} />
       </div>
       <Typography variant="bodySm" tone="muted" wrap="break">{roleLabel(manager.role)} · {manager.managerProfile?.workingStatus ?? 'профиль ожидает заполнения'}</Typography>
-      {(auth.user?.role === 'OWNER' || auth.user?.role === 'ADMIN') && (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => status.mutate('ACTIVE')}>Активировать</Button>
-          <Button size="sm" variant="outline" onClick={() => status.mutate('DISABLED')}>Отключить</Button>
+      {canManageRole && (
+        <div className="grid gap-3">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <label className="grid gap-2">
+              <Typography variant="label">Роль</Typography>
+              <select
+                aria-label={`Роль ${manager.displayName ?? manager.email}`}
+                className={fieldClass}
+                value={nextRole}
+                onChange={(event) => setNextRole(event.target.value)}
+                disabled={role.isPending}
+              >
+                {roleOptions.map((roleValue) => (
+                  <option key={roleValue} value={roleValue}>{roleLabel(roleValue)}</option>
+                ))}
+              </select>
+            </label>
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-end"
+              onClick={() => role.mutate(nextRole)}
+              disabled={role.isPending || nextRole === (manager.role === 'SALES_REP' ? 'MANAGER' : manager.role)}
+            >
+              Сменить роль
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => status.mutate('ACTIVE')} disabled={status.isPending}>Активировать</Button>
+            <Button size="sm" variant="outline" onClick={() => status.mutate('DISABLED')} disabled={status.isPending}>Отключить</Button>
+          </div>
+          <div className="grid gap-2">
+            {role.error && <ErrorText error={role.error} />}
+            {status.error && <ErrorText error={status.error} />}
+          </div>
         </div>
       )}
     </div>

@@ -785,3 +785,15 @@ CI follow-up:
 * Validation passed: `bun run --cwd webapp typecheck`, `bun run --cwd webapp lint`, `bun run --cwd webapp test`, `bun run --cwd webapp build`, `bun run test:contracts`, `bun run typecheck`, `bun run test`, and `bun run build`.
 * Local browser smoke passed with backend running: clean auth screen has no console errors/failed requests; stale cached session returns to auth, clears cache, and shows no dashboard loader; admin login reaches `Операционный дашборд`; desktop navigation across leads/orders/visits/settings has no console errors, failed requests, 5xx responses, or horizontal overflow; mobile dashboard has no console errors, failed requests, 5xx responses, or horizontal overflow.
 * Expected note: stale cached session recovery intentionally receives one `401` from `/api/auth/refresh` before clearing local cache; this is the controlled recovery path and no longer leaves the dashboard spinning.
+
+## Role Change UI and Role Instructions - 2026-07-11
+
+* User reported that role switching disappeared and asked for step-by-step instructions for every role, including what to press and which functions should be available.
+* Backend role endpoint `/api/admin/users/:id/role` was already working; local API smoke changed `rep1@rolf-demo.local` from `MANAGER` to `VIEWER` and back to `MANAGER`.
+* Restored role controls in the webapp manager cards: OWNER/ADMIN users now see a role select and `Сменить роль` button wired to `updateAdminUserRole`.
+* Fixed the disappearing-card behavior after role changes: OWNER/ADMIN team management now loads managed users from `/api/admin/users` instead of only `/api/admin/managers`, so a user changed to `VIEWER` or `ADMIN` remains visible in the list.
+* Kept safety boundaries: the card role select offers `ADMIN`, `SUPERVISOR`, `MANAGER`, and `VIEWER`; backend still blocks unauthorized OWNER changes.
+* Expanded the dashboard guide into concrete step-by-step instructions for `OWNER`, `ADMIN`, `SUPERVISOR`, `MANAGER`, and `VIEWER`, including which sections to press and which controls should or should not be available.
+* Added regression tests in `webapp/tests/owner-ui.test.ts` for role-change controls, managed-user list source, and per-role instructions.
+* Browser smoke passed locally: Omar Al Farsi changed `MANAGER -> VIEWER`, stayed visible as `Просмотр`, then changed back to `MANAGER`; no console errors, failed requests, 5xx responses, or horizontal overflow.
+* Validation passed: `bun run --cwd webapp typecheck`, `bun run --cwd webapp lint`, `bun run --cwd webapp test`, `bun run --cwd webapp build`, `bun run typecheck`, `bun run test:contracts`, and `bun run test`.
