@@ -62,7 +62,7 @@ export function parseBotTextCommand(text: string): ParsedBotAction {
   if (match) return action('manager_find', 'manager', { name: match[1] }, false, 'low')
 
   match = normalized.match(/создай заявку клиент\s+(.+?)\s+сумма\s+(\d+(?:[.,]\d+)?)\s+источник\s+(.+)/i)
-  if (match) return action('lead_create', 'lead', { clientName: match[1], amount: Number(match[2].replace(',', '.')), source: match[3] }, false, 'medium')
+  if (match) return action('lead_create', 'lead', { clientName: match[1], amount: Number(match[2].replace(',', '.')), source: match[3] }, true, 'medium')
 
   match = normalized.match(/назначь заявку\s+(\S+)\s+на\s+(.+)/i)
   if (match) return action('lead_assign', 'lead', { leadId: match[1], managerName: match[2] }, true, 'medium')

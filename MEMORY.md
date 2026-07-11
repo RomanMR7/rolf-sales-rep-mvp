@@ -703,3 +703,5 @@ CI follow-up:
 * Amended and pushed final feature commit `9ca2e07` to `main`; GitHub/Vercel status reported success.
 * Live Render checks after `9ca2e07`: `/health` 200, `/telegram/config` 200, `/telegram/webhook` `/start` returns Russian Mini App button, owner preview flow works, manager receives 403 on admin users, admin managers/functions/scripts/metrics/activity-log endpoints work.
 * Live Telegram bot executor smoke passed: temporary admin webhook command created pending confirmation, `confirm:*` callback executed `function_toggle`, `/api/admin/functions` showed the test flag enabled, then the temporary user was disabled.
+* Follow-up fix: Telegram bot confirmed callbacks now also execute lead creation, lead assignment, and lead status close/cancel actions; lead creation now requires inline confirmation.
+* Validation after lead bot executor fix passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run typecheck`, `bun run test:contracts`, `bun run --cwd webapp lint`, `bun run --cwd webapp build`, `bun run test`, and a standalone `bun run smoke:backend:docker`.

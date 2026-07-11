@@ -267,6 +267,48 @@ async function executeConfirmedBotAction(tx: any, pending: { intent: string; pay
         note: 'Внесено через Telegram-бота',
       },
     })
+    return
+  }
+  if (pending.intent === 'lead_create') {
+    const clientName = String(params.clientName ?? '').trim()
+    if (!clientName) return
+    await tx.deal.create({
+      data: {
+        title: clientName,
+        clientName,
+        amount: typeof params.amount === 'number' ? params.amount : 0,
+        source: params.source ? String(params.source) : null,
+        status: 'NEW',
+        createdBy: pending.actorUserId,
+      },
+    })
+    return
+  }
+  if (pending.intent === 'lead_assign') {
+    const leadId = String(params.leadId ?? '')
+    if (!isUuid(leadId)) return
+    const manager = await findUserForBotAction(tx, params)
+    if (!manager) return
+    await tx.deal.updateMany({
+      where: { id: leadId },
+      data: {
+        assignedManagerId: manager.id,
+        status: 'TAKEN',
+      },
+    })
+    return
+  }
+  if (pending.intent === 'lead_status') {
+    const leadId = String(params.leadId ?? '')
+    const status = String(params.status ?? '')
+    if (!isUuid(leadId) || !['SUCCESS', 'CANCELLED'].includes(status)) return
+    await tx.deal.updateMany({
+      where: { id: leadId },
+      data: {
+        status,
+        closedAt: new Date(),
+      },
+    })
   }
 }
 
@@ -294,6 +336,10 @@ function dateForPeriod(period: string) {
 function metricValue(value: unknown, current: number | undefined, add: boolean) {
   if (typeof value !== 'number') return current ?? 0
   return add ? (current ?? 0) + value : value
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
 
 function mainMenu(role: string, webAppUrl?: string | null) {

@@ -38,6 +38,24 @@ describe('bot command parser', () => {
     })
   })
 
+  test('recognizes lead commands with confirmation', () => {
+    expect(parseBotTextCommand('создай заявку клиент Dubai Marina сумма 250000 источник Telegram')).toMatchObject({
+      intent: 'lead_create',
+      params: { clientName: 'Dubai Marina', amount: 250000, source: 'Telegram' },
+      requiresConfirmation: true,
+    })
+    expect(parseBotTextCommand('назначь заявку 018f4ce0-b643-7e05-a7c7-c5859aa4e102 на Иван')).toMatchObject({
+      intent: 'lead_assign',
+      params: { leadId: '018f4ce0-b643-7e05-a7c7-c5859aa4e102', managerName: 'Иван' },
+      requiresConfirmation: true,
+    })
+    expect(parseBotTextCommand('закрой заявку 018f4ce0-b643-7e05-a7c7-c5859aa4e102')).toMatchObject({
+      intent: 'lead_status',
+      params: { leadId: '018f4ce0-b643-7e05-a7c7-c5859aa4e102', status: 'SUCCESS' },
+      requiresConfirmation: true,
+    })
+  })
+
   test('recognizes owner preview and stop commands', () => {
     expect(parseBotTextCommand('покажи как менеджер')).toMatchObject({
       intent: 'owner_preview_role',
