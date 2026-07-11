@@ -21,6 +21,43 @@ const fieldClass = 'h-10 rounded-lg border px-3'
 
 type View = 'today' | 'owner' | 'leads' | 'managers' | 'metrics' | 'settings' | 'functions' | 'scripts' | 'clients' | 'catalog' | 'orders' | 'visits' | 'admin'
 
+const workspaceGuide = [
+  {
+    title: 'Быстрый старт',
+    items: [
+      'Откройте бота в Telegram, нажмите /start и войдите в Mini App через кнопку Workspace.',
+      'На главной странице проверьте текущие заявки, ближайшие действия и свежие изменения команды.',
+      'Если работаете с компьютера, используйте кнопку "Открыть на компьютере" в боте.',
+    ],
+  },
+  {
+    title: 'Настройка владельцем и админом',
+    items: [
+      'Откройте "Менеджеры", добавьте сотрудника по Telegram ID и назначьте роль.',
+      'В "Настройках" включайте или отключайте рабочие функции: заявки, скрипты, метрики и доступы.',
+      'В "Владелец" используйте предпросмотр роли или вход от лица сотрудника, чтобы проверить его интерфейс.',
+    ],
+  },
+  {
+    title: 'Работа менеджера',
+    items: [
+      'Откройте "Заявки", обновляйте статус клиента и фиксируйте следующий шаг.',
+      'Используйте "Скрипты" для единых сообщений клиентам и "Метрики" для контроля результата.',
+      'Все важные действия сохраняются в audit log, чтобы руководитель видел историю изменений.',
+    ],
+  },
+  {
+    title: 'Права доступа',
+    items: [
+      'OWNER управляет всеми ролями, настройками, функциями и режимами проверки.',
+      'ADMIN управляет командой и рабочими данными без смены владельца.',
+      'SUPERVISOR смотрит командные показатели и помогает контролировать менеджеров.',
+      'MANAGER работает только со своими клиентами, заявками и показателями.',
+      'VIEWER получает режим просмотра без управленческих действий.',
+    ],
+  },
+]
+
 export function RootLayout() {
   return (
     <main className="min-h-svh bg-background text-foreground">
@@ -295,11 +332,28 @@ function Dashboard() {
   return (
     <div className="grid gap-4">
       <Card>
-        <CardContent className="grid gap-2">
-          <Typography variant="h6">{'MVP для демонстрации процесса: визит -> заказ -> согласование менеджером'}</Typography>
-          <Typography variant="bodySm" tone="muted">
-            Данные ограничиваются ролью пользователя: торговый представитель видит свой маршрут, менеджер и администратор видят всю команду.
-          </Typography>
+        <CardHeader>
+          <CardTitle>Как пользоваться ROLF Dubai Sales Suite</CardTitle>
+          <CardDescription>
+            Короткая инструкция для владельца, администратора, руководителя и менеджера.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          {workspaceGuide.map((section) => (
+            <section key={section.title} className="grid gap-3 rounded-lg border border-border/70 bg-background/35 p-4">
+              <Typography variant="h6">{section.title}</Typography>
+              <ul className="grid gap-2">
+                {section.items.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
+                    <Typography variant="bodySm" tone="muted">
+                      {item}
+                    </Typography>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
         </CardContent>
       </Card>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -744,3 +744,9 @@ CI follow-up:
 * Added `webapp/vercel.json` rewrite from `/(.*)` to `/index.html` so Telegram/Desktop direct links such as `/app/owner` load the webapp shell.
 * Added `webapp/tests/vercel-config.test.ts` to keep this production routing rule covered.
 * Validation passed locally: `bun run --cwd webapp typecheck`, `bun run --cwd webapp test`, `bun run --cwd webapp build`, and `bun run --cwd webapp lint`.
+
+## Role Instruction Copy Update - 2026-07-11
+
+* User requested removing the old demo wording about "visit -> order -> manager approval" and replacing it with clear usage/setup instructions for all roles.
+* Replaced the dashboard intro card with a role guide covering quick start, owner/admin setup, manager workflow, and role access boundaries.
+* Validation passed: `bun run --cwd webapp typecheck`, `bun run --cwd webapp test`, `bun run --cwd webapp build`, and `bun run --cwd webapp lint`.
