@@ -13,23 +13,26 @@ import { useAuth } from '@/lib/use-auth'
 
 const navLinkClass = cn(
   buttonVariants({ variant: 'ghost', size: 'sm' }),
-  'text-muted-foreground data-[status=active]:bg-secondary data-[status=active]:text-secondary-foreground data-[status=active]:hover:bg-secondary/80'
+  'text-muted-foreground data-[status=active]:border data-[status=active]:border-primary/30 data-[status=active]:bg-primary/12 data-[status=active]:text-primary data-[status=active]:hover:bg-primary/16'
 )
+
+const panelClass = 'rounded-xl border border-border/70 bg-card/72 p-4 shadow-[0_18px_46px_-36px_black]'
+const fieldClass = 'h-10 rounded-lg border px-3'
 
 type View = 'today' | 'leads' | 'managers' | 'metrics' | 'settings' | 'functions' | 'scripts' | 'clients' | 'catalog' | 'orders' | 'visits' | 'admin'
 
 export function RootLayout() {
   return (
     <main className="min-h-svh bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/92 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/82 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link to="/" className="flex items-center gap-3">
-            <Typography as="span" variant="avatar" tone="inverse" className="grid size-10 place-items-center rounded-md bg-primary">
+            <Typography as="span" variant="avatar" tone="inverse" className="grid size-10 place-items-center rounded-lg border border-primary/45 bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_var(--primary)]">
               RS
             </Typography>
             <span className="grid gap-0.5">
-              <Typography as="span" variant="h6">ROLF Sales App</Typography>
-              <Typography as="span" variant="bodyXs" tone="muted" className="block uppercase">Dubai MVP</Typography>
+              <Typography as="span" variant="h6">ROLF Dubai</Typography>
+              <Typography as="span" variant="bodyXs" tone="muted" className="block uppercase">Executive Sales Suite</Typography>
             </span>
           </Link>
           <nav className="ml-auto flex items-center gap-1" aria-label="Primary">
@@ -75,21 +78,12 @@ function Workspace() {
 
   return (
     <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 pb-24 pt-5 sm:px-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge variant="outline" className="border-amber-400/60 bg-amber-50 text-amber-900">
-          {auth.user.role}
-        </Badge>
-        <Typography variant="h2">
-          {auth.user.displayName ?? auth.user.email}
-        </Typography>
-        <Typography variant="bodySm" tone="muted">
-          Вы вошли как {roleLabel(auth.user.role)}
-        </Typography>
-        <Button className="ml-auto" variant="outline" onClick={() => void auth.logout()}>
-          Logout
-        </Button>
-      </div>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-3 py-2 backdrop-blur sm:hidden">
+      <WorkspaceHero
+        displayName={auth.user.displayName ?? auth.user.email}
+        role={auth.user.role}
+        onLogout={() => void auth.logout()}
+      />
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/88 px-3 py-2 backdrop-blur-xl sm:hidden">
         <nav className="mx-auto grid max-w-md grid-cols-5 gap-1" aria-label="Mini App">
           {views.slice(0, 5).map(([key, label]) => (
             <Button key={key} size="sm" variant={view === key ? 'default' : 'ghost'} className="h-11 px-1" onClick={() => setView(key)}>
@@ -124,6 +118,40 @@ function Workspace() {
       {view === 'visits' && <Visits />}
       {view === 'admin' && canAdmin && <Admin />}
     </section>
+  )
+}
+
+function WorkspaceHero({
+  displayName,
+  role,
+  onLogout,
+}: {
+  displayName: string
+  role: string
+  onLogout: () => void
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-[linear-gradient(135deg,oklch(0.255_0.036_248/0.96),oklch(0.16_0.022_248/0.98)_58%,oklch(0.28_0.04_188/0.55))] p-5 shadow-[0_28px_70px_-48px_black]">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
+      <div className="relative flex flex-wrap items-end gap-4">
+        <div className="grid min-w-0 flex-1 gap-3">
+          <Badge variant="outline" className="w-fit border-primary/45 bg-primary/12 text-primary">
+            {roleLabel(role)}
+          </Badge>
+          <div className="grid gap-1">
+            <Typography variant="h2" className="max-w-3xl text-foreground">
+              {displayName}
+            </Typography>
+            <Typography variant="bodySm" tone="muted">
+              Панель продаж ROLF Dubai: лиды, менеджеры, метрики и контроль доступа в одном Telegram Mini App.
+            </Typography>
+          </div>
+        </div>
+        <Button variant="outline" onClick={onLogout}>
+          Выйти
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -725,12 +753,13 @@ function TelegramAuthScreen() {
   }
 
   return (
-    <section className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_360px]">
-      <Card>
+    <section className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_360px]">
+      <Card className="relative overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/20 via-primary to-accent/80" />
         <CardHeader>
-          <Badge variant="outline" className="w-fit border-amber-400/60 bg-amber-50 text-amber-900">Telegram Mini App</Badge>
-          <CardTitle>ROLF Sales App</CardTitle>
-          <CardDescription>Secure sign-in for the Dubai sales representative MVP.</CardDescription>
+          <Badge variant="outline" className="w-fit border-primary/45 bg-primary/12 text-primary">Telegram Mini App</Badge>
+          <CardTitle>ROLF Dubai Sales Suite</CardTitle>
+          <CardDescription>Безопасный вход в премиальную панель продаж через Telegram.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <StatusRow label="Telegram WebApp" value={telegramWebApp ? 'detected' : 'not detected'} />
@@ -749,7 +778,7 @@ function TelegramAuthScreen() {
           </div>
           {!telegramWebApp && (
             <Typography variant="bodySm" tone="muted">
-              Open this URL from the configured Telegram bot menu or direct Mini App link. Browser mode does not grant admin access.
+              Откройте приложение из меню Telegram-бота или прямой кнопки Mini App. Браузерный режим не выдает админ-доступ.
             </Typography>
           )}
           {isDev && (
@@ -759,13 +788,13 @@ function TelegramAuthScreen() {
                 <Typography variant="h6">Local dev login</Typography>
                 <input
                   aria-label="Demo email"
-                  className="h-10 rounded-md border bg-background px-3"
+                  className={fieldClass}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                 />
                 <input
                   aria-label="Demo password"
-                  className="h-10 rounded-md border bg-background px-3"
+                  className={fieldClass}
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -814,10 +843,10 @@ function LoadingState() {
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle>{value}</CardTitle>
+    <Card className="bg-[linear-gradient(145deg,oklch(0.225_0.028_247/0.94),oklch(0.18_0.022_247/0.9))]">
+      <CardHeader className="gap-3">
+        <CardDescription className="uppercase">{label}</CardDescription>
+        <CardTitle className="text-primary">{value}</CardTitle>
       </CardHeader>
     </Card>
   )
@@ -825,7 +854,7 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 
 function Row({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="grid gap-1 rounded-md border bg-background p-3">
+    <div className={cn(panelClass, 'grid gap-1')}>
       <Typography variant="emphasis" wrap="break">{title}</Typography>
       <Typography variant="bodySm" tone="muted" wrap="break">{detail}</Typography>
     </div>
@@ -834,7 +863,7 @@ function Row({ title, detail }: { title: string; detail: string }) {
 
 function StatusRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-1 rounded-md border bg-background p-3">
+    <div className={cn(panelClass, 'grid gap-1')}>
       <Typography variant="bodySm" tone="muted">{label}</Typography>
       <Typography variant="emphasis" wrap="break">{value}</Typography>
     </div>

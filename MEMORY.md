@@ -679,3 +679,11 @@ CI follow-up:
 * Found Telegram `/start` could not work end-to-end because there was helper code but no webhook endpoint. Added `POST /telegram/webhook` and `/api/telegram/webhook`; `/start`, `/help`, and `/settings` return Telegram `sendMessage` payloads with a Web App button.
 * Added `backend/src/telegram/bot.test.ts` and documented Telegram `setWebhook` command in `docs/TELEGRAM_SETUP.md`.
 * Validation after fixes passed: `bun run typecheck`, `bun run --cwd webapp lint`, `bun run test`, `bun run --cwd webapp build`, and `bun run smoke:backend:docker`.
+
+## ROLF Dubai Premium UI Direction - 2026-07-10
+
+* User requested a premium design in the style of ROLF Dubai.
+* Direct public brand-guide information for "ROLF Dubai" was not found; visual direction chosen: executive Dubai auto showroom, graphite/night base, warm gold primary, teal metallic accent, glassy panels, compact Telegram-first layout.
+* Updated webapp theme tokens, buttons, cards, header branding, unauthenticated Telegram fallback, workspace hero, metrics, rows, and status panels.
+* Validation passed: `bun run --cwd webapp typecheck`, `bun run --cwd webapp build`, `bun run --cwd webapp lint`, and `bun run --cwd webapp test`.
+* Browser check via Edge CDP confirmed mobile fallback renders, premium title appears, and mobile viewport has no horizontal overflow.
