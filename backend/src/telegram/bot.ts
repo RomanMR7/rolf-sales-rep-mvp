@@ -6,7 +6,7 @@ import { parseBotTextCommand, type ParsedBotAction } from './botCommandParser'
 
 type TelegramMessage = {
   chat: { id: number | string }
-  from?: { id: number | string }
+  from?: { id: number | string; username?: string; first_name?: string; last_name?: string }
   text?: string
 }
 
@@ -14,7 +14,7 @@ type TelegramUpdate = {
   message?: TelegramMessage
   callback_query?: {
     id: string
-    from: { id: number | string }
+    from: { id: number | string; username?: string; first_name?: string; last_name?: string }
     message?: { chat: { id: number | string } }
     data?: string
   }
@@ -56,7 +56,7 @@ export function telegramBotResponseForUpdate(update: TelegramUpdate, env: Pick<A
 
 export async function telegramBotResponseForUpdateWithDb(
   update: TelegramUpdate,
-  env: Pick<AppEnv, 'TELEGRAM_WEBAPP_URL'>,
+  env: Pick<AppEnv, 'TELEGRAM_WEBAPP_URL' | 'ADMIN_TELEGRAM_IDS'>,
   db: DbClient,
 ) {
   const callback = update.callback_query
@@ -66,9 +66,7 @@ export async function telegramBotResponseForUpdateWithDb(
 
   const message = update.message
   if (!message?.text) return null
-  const user = message.from?.id
-    ? await db.user.findUnique({ where: { telegramId: String(message.from.id) } })
-    : null
+  const user = await ensureTelegramBotUser(message.from, db, env)
   const role = publicRole(user?.role ?? 'VIEWER')
   const command = message.text.split(/\s+/)[0]
 
@@ -156,7 +154,7 @@ export function telegramWebhookReplyForUpdate(update: TelegramUpdate, env: Pick<
 
 export async function telegramWebhookReplyForUpdateWithDb(
   update: TelegramUpdate,
-  env: Pick<AppEnv, 'TELEGRAM_WEBAPP_URL'>,
+  env: Pick<AppEnv, 'TELEGRAM_WEBAPP_URL' | 'ADMIN_TELEGRAM_IDS'>,
   db: DbClient,
 ) {
   const response = await telegramBotResponseForUpdateWithDb(update, env, db)
@@ -171,10 +169,10 @@ export async function telegramWebhookReplyForUpdateWithDb(
 async function handleCallback(
   callback: NonNullable<TelegramUpdate['callback_query']>,
   db: DbClient,
-  env: Pick<AppEnv, 'TELEGRAM_WEBAPP_URL'>,
+  env: Pick<AppEnv, 'TELEGRAM_WEBAPP_URL' | 'ADMIN_TELEGRAM_IDS'>,
 ) {
   const data = callback.data ?? ''
-  const botUser = await botUserFromCallback(callback, db)
+  const botUser = await ensureTelegramBotUser(callback.from, db, env)
   if (data.startsWith('menu:')) return handleMenuCallback(callback, data, botUser, db, env)
   if (data.startsWith('managers:')) return handleManagersCallback(callback, data, botUser, db)
   if (data.startsWith('manager:')) return handleManagerDetailCallback(callback, data, botUser, db)
@@ -220,8 +218,40 @@ async function handleCallback(
   return { chat_id: callback.message?.chat.id ?? callback.from.id, text: 'Готово. Действие подтверждено и записано в audit log.' }
 }
 
-async function botUserFromCallback(callback: NonNullable<TelegramUpdate['callback_query']>, db: DbClient) {
-  return db.user.findUnique({ where: { telegramId: String(callback.from.id) } })
+async function ensureTelegramBotUser(
+  from: TelegramMessage['from'],
+  db: DbClient,
+  env: Pick<AppEnv, 'ADMIN_TELEGRAM_IDS'>,
+) {
+  if (!from?.id) return null
+  const telegramId = String(from.id)
+  const existing = await db.user.findUnique({ where: { telegramId } })
+  const isConfiguredOwner = env.ADMIN_TELEGRAM_IDS.includes(telegramId)
+  if (existing) {
+    if (isConfiguredOwner && (existing.role !== 'OWNER' || existing.status !== 'ACTIVE')) {
+      return db.user.update({ where: { id: existing.id }, data: { role: 'OWNER', status: 'ACTIVE' } })
+    }
+    return existing
+  }
+  if (!isConfiguredOwner) return null
+  return db.user.create({
+    data: {
+      email: `telegram-${telegramId}@telegram.rolf-sales-rep-mvp.local`,
+      passwordHash: await Bun.password.hash(randomUUID()),
+      displayName: displayNameFromTelegram(from) ?? `Telegram ${telegramId}`,
+      role: 'OWNER',
+      status: 'ACTIVE',
+      telegramId,
+      telegramUsername: from.username,
+      telegramFirstName: from.first_name,
+      telegramLastName: from.last_name,
+    },
+  })
+}
+
+function displayNameFromTelegram(from: TelegramMessage['from']) {
+  if (!from) return null
+  return [from.first_name, from.last_name].filter(Boolean).join(' ') || from.username || null
 }
 
 function callbackChatId(callback: NonNullable<TelegramUpdate['callback_query']>) {
@@ -254,6 +284,15 @@ async function handleMenuCallback(
   const role = publicRole(user?.role ?? 'VIEWER')
   const chatId = callbackChatId(callback)
   const section = data.split(':')[1]
+  if (section === 'profile') {
+    return {
+      chat_id: chatId,
+      text: user
+        ? `Вы: ${user.displayName ?? user.email}\nTelegram ID: ${user.telegramId ?? 'не привязан'}\nРоль: ${roleLabel(role)}\nСтатус: ${statusLabel(user.status)}`
+        : `Telegram ID: ${callback.from.id}\nПользователь не найден в системе.`,
+      reply_markup: mainMenu(role, env.TELEGRAM_WEBAPP_URL),
+    }
+  }
   if (section === 'metrics') return metricsMenu(chatId, role, db)
   if (section === 'managers') return managersMenu(chatId, role, db)
   if (section === 'leads') return leadsMenu(chatId, role, db)
@@ -670,12 +709,16 @@ function isUuid(value: string) {
 
 function mainMenu(role: string, webAppUrl?: string | null) {
   const rows = []
+  rows.push([{ text: '👤 Кто я', callback_data: 'menu:profile' }])
   if (role === 'OWNER' || role === 'ADMIN') {
     rows.push([{ text: '📊 Метрики', callback_data: 'menu:metrics' }, { text: '👥 Менеджеры', callback_data: 'menu:managers' }])
     rows.push([{ text: '🧾 Заявки', callback_data: 'menu:leads' }, { text: '⚙️ Настройки', callback_data: 'menu:settings' }])
   }
   if (role === 'OWNER') rows.push([{ text: '🧑‍💼 Режим владельца', callback_data: 'menu:owner' }, { text: '🚨 Система', callback_data: 'menu:system' }])
-  if (webAppUrl) rows.push([{ text: '🚀 Открыть кабинет', web_app: { url: webAppUrl } }])
+  if (webAppUrl) {
+    rows.push([{ text: '🚀 Открыть Mini App', web_app: { url: webAppUrl } }])
+    rows.push([{ text: '💻 Открыть на компьютере', url: webAppUrl }])
+  }
   return rows.length ? { inline_keyboard: rows } : undefined
 }
 

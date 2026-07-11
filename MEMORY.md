@@ -725,3 +725,8 @@ CI follow-up:
 * Added unit coverage to ensure owner inline menu callbacks answer instead of going silent.
 * Validation passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run test`, and standalone `bun run smoke:backend:docker`.
 * Live Render smoke after commit `529ef44` passed: `menu:system` callback returned system status, manager detail returned inline controls, role picker opened, `setrole:<id>:MANAGER` created a confirmation, `confirm:*` changed the temporary user's role to `MANAGER`, and temporary smoke users were disabled.
+* User then reported Telegram Desktop showed no buttons after `/start`.
+* Root cause: unknown users received only a `web_app` inline button, which Telegram Desktop may hide or not render like mobile Mini App buttons; also OWNER role in the bot required an existing DB user from prior Mini App login.
+* Fixed bot `/start` to include a normal URL button (`Открыть на компьютере`) in addition to the Mini App `web_app` button and a `Кто я` callback button.
+* Fixed bot-side owner bootstrap: if `message.from.id` / callback `from.id` is in `ADMIN_TELEGRAM_IDS`, the bot creates or upgrades that Telegram user to active `OWNER` before building the menu, so owner/admin buttons appear immediately.
+* Validation passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run test`, and standalone `bun run smoke:backend:docker`.

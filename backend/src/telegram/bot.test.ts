@@ -48,6 +48,43 @@ describe('Telegram bot webhook helpers', () => {
     ).toEqual({ ok: true })
   })
 
+  test('db-aware start bootstraps configured owner and includes desktop URL fallback', async () => {
+    const createdUsers: unknown[] = []
+    const db = {
+      user: {
+        findUnique: async () => null,
+        create: async ({ data }: { data: unknown }) => {
+          createdUsers.push(data)
+          return { id: 'owner-id', role: 'OWNER', status: 'ACTIVE', telegramId: '700001', displayName: 'Roman' }
+        },
+      },
+    } as any
+
+    const reply = await telegramWebhookReplyForUpdateWithDb(
+      {
+        message: {
+          chat: { id: 123 },
+          from: { id: 700001, first_name: 'Roman' },
+          text: '/start',
+        },
+      },
+      { TELEGRAM_WEBAPP_URL: 'https://rolf-sales-rep-mvp-webapp.vercel.app', ADMIN_TELEGRAM_IDS: ['700001'] },
+      db,
+    )
+
+    expect(createdUsers).toHaveLength(1)
+    expect(reply).toMatchObject({
+      method: 'sendMessage',
+      reply_markup: {
+        inline_keyboard: expect.arrayContaining([
+          expect.arrayContaining([expect.objectContaining({ callback_data: 'menu:managers' })]),
+          expect.arrayContaining([expect.objectContaining({ callback_data: 'menu:owner' })]),
+          expect.arrayContaining([expect.objectContaining({ url: 'https://rolf-sales-rep-mvp-webapp.vercel.app' })]),
+        ]),
+      },
+    })
+  })
+
   test('answers owner inline menu callbacks instead of going silent', async () => {
     const db = {
       user: {
@@ -68,7 +105,7 @@ describe('Telegram bot webhook helpers', () => {
           data: 'menu:system',
         },
       },
-      { TELEGRAM_WEBAPP_URL: 'https://rolf-sales-rep-mvp-webapp.vercel.app' },
+      { TELEGRAM_WEBAPP_URL: 'https://rolf-sales-rep-mvp-webapp.vercel.app', ADMIN_TELEGRAM_IDS: [] },
       db,
     )
 
