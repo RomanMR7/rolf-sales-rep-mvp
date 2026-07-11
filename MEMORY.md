@@ -735,3 +735,4 @@ CI follow-up:
 * Added automatic Telegram webhook registration on backend startup using `TELEGRAM_BOT_TOKEN` and `BACKEND_PUBLIC_URL`, with allowed updates `message` and `callback_query`.
 * Added explicit `sendMessage` delivery from webhook route when `TELEGRAM_BOT_TOKEN` is available; if direct send fails, backend falls back to the Telegram webhook-response JSON.
 * Validation passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run test`, and standalone `bun run smoke:backend:docker`.
+* Live check after commit `3b656e8`: `/telegram/config` reports `webhookUrl=https://rolf-sales-rep-mvp-backend.onrender.com/telegram/webhook`; manual webhook POST returns the current button payload. Real chat delivery now depends on Telegram reaching this webhook and backend `sendMessage` succeeding for the real chat id.
