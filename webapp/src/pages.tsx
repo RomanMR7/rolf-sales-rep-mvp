@@ -876,7 +876,7 @@ function TelegramAuthScreen() {
     try {
       await action()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Authentication failed')
+      setError(authErrorMessage(caught))
     } finally {
       setIsSubmitting(false)
     }
@@ -898,7 +898,7 @@ function TelegramAuthScreen() {
           <Separator />
           <div className="flex flex-wrap gap-3">
             <Button disabled={!initData || isSubmitting} onClick={() => void submit(() => auth.telegramAuth({ initData }))}>
-              Войти через Telegram
+              {isSubmitting ? 'Поднимаем сервер...' : 'Войти через Telegram'}
             </Button>
             {isDev && (
               <Button variant="outline" disabled={isSubmitting} onClick={() => void submit(() => auth.telegramAuth({ devUser: { telegramId: '100001', username: 'demo_sales_rep', firstName: 'Demo', lastName: 'Rep' } }))}>
@@ -956,6 +956,15 @@ function TelegramAuthScreen() {
       )}
     </section>
   )
+}
+
+function authErrorMessage(caught: unknown) {
+  const message = caught instanceof Error ? caught.message : ''
+  if (message.includes('Backend is unreachable') || message.includes('Failed to fetch')) {
+    return 'Сервер Render просыпается или временно недоступен. Подождите 30-60 секунд и нажмите «Войти через Telegram» еще раз.'
+  }
+  if (message.includes('Telegram')) return message
+  return message || 'Не удалось войти. Попробуйте еще раз.'
 }
 
 function LoadingState() {

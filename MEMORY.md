@@ -706,3 +706,11 @@ CI follow-up:
 * Follow-up fix: Telegram bot confirmed callbacks now also execute lead creation, lead assignment, and lead status close/cancel actions; lead creation now requires inline confirmation.
 * Validation after lead bot executor fix passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run typecheck`, `bun run test:contracts`, `bun run --cwd webapp lint`, `bun run --cwd webapp build`, `bun run test`, and a standalone `bun run smoke:backend:docker`.
 * Live Render check after commit `a17f2ae` passed: Telegram webhook lead creation returned inline confirmation, `confirm:*` created a test lead, follow-up bot confirmations assigned it to a manager and changed final status to `CANCELLED`; temporary smoke admin was disabled.
+
+## Telegram Login Render Cold Start Fix - 2026-07-11
+
+* User reported Telegram Mini App login error: `Backend is unreachable. Checked: https://rolf-sales-rep-mvp-backend.onrender.com`.
+* Observed cause: Render free backend cold start did not answer `/health` within 15 seconds and only returned 200 after a longer wait; webapp request timeout was too short for Telegram auth.
+* Fixed webapp Telegram auth to allow a 90-second cold-start timeout while keeping ordinary API requests shorter.
+* Replaced the client-facing English backend-unreachable auth error with a Russian message telling the user that Render is waking and to retry after 30-60 seconds if needed.
+* Validation passed: `bun run --cwd webapp typecheck`, `bun run --cwd webapp lint`, `bun run --cwd webapp test`, and `bun run --cwd webapp build`.

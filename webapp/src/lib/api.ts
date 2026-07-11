@@ -59,7 +59,11 @@ type RequestOptions = {
   auth?: boolean
   retryOnUnauthorized?: boolean
   accessTokenOverride?: string
+  timeoutMs?: number
 }
+
+const defaultRequestTimeoutMs = 12000
+const telegramAuthColdStartTimeoutMs = 90000
 
 export class ApiRequestError extends Error {
   readonly status: number
@@ -112,6 +116,7 @@ export class ApiClient {
       method: 'POST',
       body: payload,
       auth: false,
+      timeoutMs: telegramAuthColdStartTimeoutMs,
     })
   }
 
@@ -394,7 +399,7 @@ export class ApiClient {
 
     for (const baseUrl of checkedUrls) {
       const controller = new AbortController()
-      const timeout = globalThis.setTimeout(() => controller.abort(), 8000)
+      const timeout = globalThis.setTimeout(() => controller.abort(), options.timeoutMs ?? defaultRequestTimeoutMs)
       try {
         response = await fetch(`${baseUrl}${path}`, {
           method: options.method ?? 'GET',
