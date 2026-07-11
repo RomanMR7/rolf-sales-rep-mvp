@@ -730,3 +730,4 @@ CI follow-up:
 * Fixed bot `/start` to include a normal URL button (`Открыть на компьютере`) in addition to the Mini App `web_app` button and a `Кто я` callback button.
 * Fixed bot-side owner bootstrap: if `message.from.id` / callback `from.id` is in `ADMIN_TELEGRAM_IDS`, the bot creates or upgrades that Telegram user to active `OWNER` before building the menu, so owner/admin buttons appear immediately.
 * Validation passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run test`, and standalone `bun run smoke:backend:docker`.
+* Live Render smoke after commit `74c7607` passed: unknown `/start` now returns `Кто я`, `Открыть Mini App` with `web_app`, and `Открыть на компьютере` with normal `url`; this fixes Telegram Desktop clients that hide Mini App-only buttons.
