@@ -736,3 +736,11 @@ CI follow-up:
 * Added explicit `sendMessage` delivery from webhook route when `TELEGRAM_BOT_TOKEN` is available; if direct send fails, backend falls back to the Telegram webhook-response JSON.
 * Validation passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run test`, and standalone `bun run smoke:backend:docker`.
 * Live check after commit `3b656e8`: `/telegram/config` reports `webhookUrl=https://rolf-sales-rep-mvp-backend.onrender.com/telegram/webhook`; manual webhook POST returns the current button payload. Real chat delivery now depends on Telegram reaching this webhook and backend `sendMessage` succeeding for the real chat id.
+
+## Vercel Direct App Route Fix - 2026-07-11
+
+* User reported Telegram button for Owner Command Center opens Vercel `404: NOT_FOUND` for `/app/owner`.
+* Observed live `https://rolf-sales-rep-mvp-webapp.vercel.app/app/owner` returned Vercel 404 because the React SPA had no Vercel rewrite config for direct nested routes.
+* Added `webapp/vercel.json` rewrite from `/(.*)` to `/index.html` so Telegram/Desktop direct links such as `/app/owner` load the webapp shell.
+* Added `webapp/tests/vercel-config.test.ts` to keep this production routing rule covered.
+* Validation passed locally: `bun run --cwd webapp typecheck`, `bun run --cwd webapp test`, `bun run --cwd webapp build`, and `bun run --cwd webapp lint`.
