@@ -1,5 +1,6 @@
 import { createApp } from './app'
 import { createBackendRuntime } from './runtime'
+import { ensureTelegramWebhook } from './telegram/webhookSetup'
 
 const runtime = createBackendRuntime()
 const app = createApp({ env: runtime.env, prisma: runtime.prisma })
@@ -11,6 +12,10 @@ const server = Bun.serve({
 })
 
 console.log(`Backend listening on ${server.url}`)
+
+void ensureTelegramWebhook(runtime.env).catch((error: unknown) => {
+  console.error('[telegram] Webhook auto-setup crashed', error instanceof Error ? error.message : String(error))
+})
 
 let shuttingDown = false
 

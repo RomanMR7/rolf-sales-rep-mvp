@@ -14,6 +14,8 @@ import { errorResponse, handleError, validationErrorHook } from './http/errors'
 import { createOwnerRoutes } from './owner/routes'
 import { createStorageServiceFromEnv } from './storage/service'
 import { telegramWebhookReplyForUpdateWithDb } from './telegram/bot'
+import { sendTelegramWebhookReply } from './telegram/send'
+import { telegramWebhookUrl } from './telegram/webhookSetup'
 
 type CreateAppOptions = {
   env: AppEnv
@@ -107,11 +109,15 @@ export function createApp({ env, prisma }: CreateAppOptions) {
   app.get('/api/telegram/config', (c) => telegramConfig(c.get('env')))
   app.post('/telegram/webhook', async (c) => {
     const update = await c.req.json().catch(() => ({}))
-    return c.json(await telegramWebhookReplyForUpdateWithDb(update, c.get('env'), prisma), 200)
+    const reply = await telegramWebhookReplyForUpdateWithDb(update, c.get('env'), prisma)
+    if (await sendTelegramWebhookReply(c.get('env'), reply)) return c.json({ ok: true }, 200)
+    return c.json(reply, 200)
   })
   app.post('/api/telegram/webhook', async (c) => {
     const update = await c.req.json().catch(() => ({}))
-    return c.json(await telegramWebhookReplyForUpdateWithDb(update, c.get('env'), prisma), 200)
+    const reply = await telegramWebhookReplyForUpdateWithDb(update, c.get('env'), prisma)
+    if (await sendTelegramWebhookReply(c.get('env'), reply)) return c.json({ ok: true }, 200)
+    return c.json(reply, 200)
   })
   app.route('/api/admin', createAdminRoutes(prisma))
   app.route('/api/owner', createOwnerRoutes(prisma))
@@ -143,7 +149,7 @@ function telegramConfig(env: AppEnv) {
     startCommand: '/start',
     menuButtonUrl: webAppUrl,
     directLink: username ? `https://t.me/${username}?startapp` : null,
-    webhookUrl: env.BACKEND_PUBLIC_URL ? `${env.BACKEND_PUBLIC_URL.replace(/\/+$/, '')}/telegram/webhook` : null,
+    webhookUrl: telegramWebhookUrl(env),
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

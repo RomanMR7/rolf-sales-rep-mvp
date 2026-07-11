@@ -731,3 +731,7 @@ CI follow-up:
 * Fixed bot-side owner bootstrap: if `message.from.id` / callback `from.id` is in `ADMIN_TELEGRAM_IDS`, the bot creates or upgrades that Telegram user to active `OWNER` before building the menu, so owner/admin buttons appear immediately.
 * Validation passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run test`, and standalone `bun run smoke:backend:docker`.
 * Live Render smoke after commit `74c7607` passed: unknown `/start` now returns `Кто я`, `Открыть Mini App` with `web_app`, and `Открыть на компьютере` with normal `url`; this fixes Telegram Desktop clients that hide Mini App-only buttons.
+* User clarified they need real Telegram chat communication where bot messages/actions update the app. Root cause found: backend had webhook routes and manual webhook responses, but startup never called Telegram `setWebhook`, so real Telegram chat messages could remain disconnected from Render.
+* Added automatic Telegram webhook registration on backend startup using `TELEGRAM_BOT_TOKEN` and `BACKEND_PUBLIC_URL`, with allowed updates `message` and `callback_query`.
+* Added explicit `sendMessage` delivery from webhook route when `TELEGRAM_BOT_TOKEN` is available; if direct send fails, backend falls back to the Telegram webhook-response JSON.
+* Validation passed: `bun run --cwd backend typecheck`, `bun run --cwd backend test:unit`, `bun run test`, and standalone `bun run smoke:backend:docker`.
