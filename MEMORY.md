@@ -700,3 +700,6 @@ CI follow-up:
 * Added webapp Owner Command Center at `/app/owner`, role preview block, user impersonation block, persistent owner-mode banner, cached `/me` shell, auth request timeout, early Telegram `ready()`/`expand()`, and Russian labels for key owner/admin screens.
 * Security scan found only placeholder token values in docs and no Telegram token pattern in git history.
 * Validation passed: `bun run typecheck`, `bun run test`, `bun run --cwd webapp lint`, `bun run --cwd webapp build`, `bun run smoke:backend:docker`, `bun run test:contracts`, and `bunx prisma validate --schema backend/prisma/schema.prisma --config backend/prisma.config.ts`.
+* Amended and pushed final feature commit `9ca2e07` to `main`; GitHub/Vercel status reported success.
+* Live Render checks after `9ca2e07`: `/health` 200, `/telegram/config` 200, `/telegram/webhook` `/start` returns Russian Mini App button, owner preview flow works, manager receives 403 on admin users, admin managers/functions/scripts/metrics/activity-log endpoints work.
+* Live Telegram bot executor smoke passed: temporary admin webhook command created pending confirmation, `confirm:*` callback executed `function_toggle`, `/api/admin/functions` showed the test flag enabled, then the temporary user was disabled.
